@@ -1,0 +1,52 @@
+name: SeekES
+options:
+  bundleIdPrefix: com.github.newpanjing
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    PRODUCT_NAME: SeekES
+    PRODUCT_BUNDLE_IDENTIFIER: com.github.newpanjing.seekes
+    INFOPLIST_FILE: ElasticClient/Info-Static.plist
+    CODE_SIGN_ENTITLEMENTS: SeekES.entitlements
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
+targets:
+  SeekES:
+    type: application
+    platform: macOS
+    sources:
+      - path: ElasticClient
+        excludes:
+          - Info.plist
+          - Info-Static.plist
+          - "**/*.lproj"
+          - Assets.xcassets
+    resources:
+      - path: ElasticClient/Assets.xcassets
+      - path: ElasticClient/en.lproj
+      - path: ElasticClient/zh-Hans.lproj
+      - path: ElasticClient/ja.lproj
+      - path: ElasticClient/ko.lproj
+      - path: ElasticClient/ru.lproj
+    settings:
+      base:
+        INFOPLIST_FILE: ElasticClient/Info-Static.plist
+        PRODUCT_NAME: SeekES
+        PRODUCT_BUNDLE_IDENTIFIER: com.github.newpanjing.seekes
+        CODE_SIGN_ENTITLEMENTS: SeekES.entitlements
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+        Release:
+          CODE_SIGN_IDENTITY: "-"
+    scheme:
+      gatherCoverageData: false
+      run:
+        config: Debug
+      archive:
+        config: Release
