@@ -2,6 +2,8 @@
 
 macOS Elasticsearch client.
 
+官网：[https://newpanjing.github.io/seekes/](https://newpanjing.github.io/seekes/)
+
 ## Download
 
 [Download the latest macOS app](https://github.com/newpanjing/seekes/releases/latest/download/SeekES-latest.zip)
