@@ -19,7 +19,7 @@ SWIFT_FILES=$(find "$SRC_DIR" -name "*.swift" -type f | tr '\n' ' ')
 
 echo "🔨 Compiling Swift sources..."
 SDK_PATH=$(xcrun --show-sdk-path --sdk macosx)
-TARGET="arm64-apple-macosx14.0"
+TARGET="$(uname -m)-apple-macosx14.0"
 
 swiftc \
     -target "$TARGET" \
