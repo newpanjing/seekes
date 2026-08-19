@@ -19,7 +19,6 @@ jobs:
         env:
           SKIP_OPEN: "1"
         run: ./build.sh
-          codesign --force --deep --sign - --entitlements SeekES.entitlements build/SeekES.app
 
       - name: Verify bundle identifier
         run: |
