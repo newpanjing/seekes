@@ -47,6 +47,9 @@ done
 echo "📝 Creating PkgInfo..."
 echo -n "APPL????" > "$CONTENTS_DIR/PkgInfo"
 
+echo "🔏 Codesigning..."
+codesign --force --deep --sign - --entitlements "$PROJECT_DIR/SeekES.entitlements" "$APP_BUNDLE"
+
 echo "✅ Build complete!"
 echo "📍 App bundle: $APP_BUNDLE"
 echo ""
