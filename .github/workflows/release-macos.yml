@@ -18,7 +18,20 @@ jobs:
       - name: Build app bundle
         env:
           SKIP_OPEN: "1"
-        run: ./build.sh
+        run: |
+          set -euxo pipefail
+          uname -a
+          swift --version
+          swift build -c release
+          rm -rf build
+          mkdir -p build/SeekES.app/Contents/{MacOS,Resources}
+          cp .build/release/SeekES build/SeekES.app/Contents/MacOS/SeekES
+          cp ElasticClient/Info-Static.plist build/SeekES.app/Contents/Info.plist
+          cp -R ElasticClient/Assets.xcassets build/SeekES.app/Contents/Resources/
+          for locale_dir in ElasticClient/*.lproj; do
+            [ -d "$locale_dir" ] && cp -R "$locale_dir" build/SeekES.app/Contents/Resources/
+          done
+          printf 'APPL????' > build/SeekES.app/Contents/PkgInfo
 
       - name: Verify bundle identifier
         run: |
