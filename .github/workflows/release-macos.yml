@@ -32,6 +32,7 @@ jobs:
             [ -d "$locale_dir" ] && cp -R "$locale_dir" build/SeekES.app/Contents/Resources/
           done
           printf 'APPL????' > build/SeekES.app/Contents/PkgInfo
+          codesign --force --deep --sign - --entitlements SeekES.entitlements build/SeekES.app
 
       - name: Verify bundle identifier
         run: |
