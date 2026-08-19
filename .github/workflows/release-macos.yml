@@ -1,0 +1,38 @@
+name: Release macOS app
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build app bundle
+        env:
+          SKIP_OPEN: "1"
+        run: ./build.sh
+
+      - name: Verify bundle identifier
+        run: |
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/SeekES.app/Contents/Info.plist)" = "com.github.newpanjing.seekes"
+
+      - name: Package app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/SeekES.app "SeekES-${GITHUB_REF_NAME}.zip"
+          cp "SeekES-${GITHUB_REF_NAME}.zip" SeekES-latest.zip
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            SeekES-${{ github.ref_name }}.zip
+            SeekES-latest.zip
+          generate_release_notes: true

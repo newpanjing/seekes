@@ -1,0 +1,218 @@
+import SwiftUI
+
+struct SettingsView: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var showConnectionManagement = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("设置")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                        .font(.title2)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            
+            Divider()
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Appearance Section
+                    SettingsSection(title: "外观", icon: "paintpalette.fill") {
+                        SettingsItem(icon: "circle.lefthalf.filled", title: "主题", iconColor: .blue) {
+                            HStack(spacing: 12) {
+                                ForEach(AppTheme.allCases) { theme in
+                                    ThemeButton(theme: theme, isSelected: appState.theme == theme) {
+                                        appState.theme = theme
+                                    }
+                                }
+                            }
+                        }
+
+                        SettingsItem(icon: "globe", title: "语言", iconColor: .green) {
+                            Picker("语言", selection: $appState.language) {
+                                ForEach(AppLanguage.allCases) { language in
+                                    Text(language.title).tag(language)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 150)
+                        }
+                    }
+                    
+                    // Connections Section
+                    SettingsSection(title: "连接", icon: "network") {
+                        SettingsItem(icon: "list.bullet", title: "管理连接", iconColor: .purple) {
+                            Button(action: {
+                                showConnectionManagement = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Text("\(appState.connections.count) 个连接")
+                                        .foregroundColor(.secondary)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                        if let currentConn = appState.currentConnection {
+                            SettingsItem(icon: appState.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill", 
+                                       title: "当前连接", 
+                                       iconColor: appState.isConnected ? .green : .red) {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(currentConn.name)
+                                        .foregroundColor(.primary)
+                                    Text(currentConn.baseURL)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        } else {
+                            SettingsItem(icon: "exclamationmark.triangle.fill", title: "当前连接", iconColor: .orange) {
+                                Text("未连接")
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    
+                    // General Section
+                    SettingsSection(title: "通用", icon: "gearshape.fill") {
+                        SettingsItem(icon: "star.fill", title: "收藏的索引", iconColor: .yellow) {
+                            Text("\(appState.favorites.count) 个")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    // About Section
+                    SettingsSection(title: "关于", icon: "info.circle.fill") {
+                        SettingsItem(icon: "number.circle.fill", title: "版本", iconColor: .gray) {
+                            Text("1.0.0")
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        SettingsItem(icon: "cube.box.fill", title: "Elasticsearch 支持", iconColor: .blue) {
+                            Text("7.x / 8.x")
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        SettingsItem(icon: "swift", title: "技术栈", iconColor: .orange) {
+                            Text("SwiftUI + SwiftData")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(20)
+            }
+        }
+        .frame(width: 600, height: 550)
+        .background(Color(NSColor.windowBackgroundColor))
+        .sheet(isPresented: $showConnectionManagement) {
+            ConnectionManagementView()
+        }
+    }
+}
+
+struct SettingsSection<Content: View>: View {
+    let title: String
+    let icon: String
+    @ViewBuilder let content: () -> Content
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+            }
+            
+            VStack(spacing: 1) {
+                content()
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(NSColor.controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+            )
+        }
+    }
+}
+
+struct SettingsItem<Content: View>: View {
+    let icon: String
+    let title: String
+    let iconColor: Color
+    @ViewBuilder let content: () -> Content
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(iconColor)
+                .frame(width: 24, height: 24)
+            
+            Text(title)
+                .font(.system(size: 14))
+            
+            Spacer()
+            
+            content()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(NSColor.controlBackgroundColor))
+    }
+}
+
+struct ThemeButton: View {
+    let theme: AppTheme
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var iconName: String {
+        switch theme {
+        case .system: return "desktopcomputer"
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.fill"
+        }
+    }
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: iconName)
+                    .font(.system(size: 18))
+                Text(theme.rawValue)
+                    .font(.system(size: 12))
+            }
+            .frame(width: 70, height: 60)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.blue.opacity(0.15) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.blue : Color.gray.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+            )
+            .foregroundColor(isSelected ? .blue : .primary)
+        }
+        .buttonStyle(.plain)
+    }
+}
