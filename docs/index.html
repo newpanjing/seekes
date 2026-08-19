@@ -3,13 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SeekES</title>
+  <meta name="theme-color" content="#f5f7f2">
+  <meta name="description" content="SeekES is a focused macOS desktop client for Elasticsearch.">
+  <title>SeekES | Elasticsearch for macOS</title>
+  <style>
+    :root { --ink: #18201d; --muted: #68736d; --line: #d9e0da; --paper: #f5f7f2; --panel: #fff; --green: #1f6b52; --green-dark: #124b3b; --mint: #dceee4; --orange: #c76d35; }
+    * { box-sizing: border-box; } html { scroll-behavior: smooth; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif; }
+    a { color: inherit; } .wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    header { padding: 22px 0; border-bottom: 1px solid var(--line); } nav { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; font-weight: 750; } .mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; color: #fff; background: var(--green); font-weight: 800; }
+    .nav-links { display: flex; align-items: center; gap: 24px; color: var(--muted); font-size: 14px; } .nav-links a { text-decoration: none; } .nav-links a:hover { color: var(--green); }
+    .hero { display: grid; grid-template-columns: 1.02fr .98fr; align-items: center; gap: 72px; padding: 88px 0 96px; }
+    .eyebrow { margin: 0 0 18px; color: var(--green); font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { max-width: 650px; margin: 0; font-size: clamp(44px, 6vw, 76px); line-height: 1.02; letter-spacing: -.045em; } .lead { max-width: 560px; margin: 24px 0 30px; color: var(--muted); font-size: 19px; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; } .button { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px; border: 1px solid var(--green); border-radius: 8px; background: var(--green); color: #fff; text-decoration: none; font-weight: 700; }
+    .button:hover { background: var(--green-dark); border-color: var(--green-dark); } .button.secondary { background: transparent; color: var(--green); border-color: var(--line); } .button.secondary:hover { border-color: var(--green); background: var(--mint); }
+    .note { margin: 14px 0 0; color: var(--muted); font-size: 13px; }
+    .window { overflow: hidden; border: 1px solid #cad5ce; border-radius: 14px; background: var(--panel); box-shadow: 0 24px 60px rgba(22, 50, 39, .14); } .window-bar { display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-bottom: 1px solid var(--line); background: #fbfcfa; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #d5ddd7; } .dot:first-child { background: #eb9b72; } .window-body { display: grid; grid-template-columns: 108px 1fr; min-height: 310px; }
+    .sidebar { padding: 22px 14px; border-right: 1px solid var(--line); background: #f0f5f0; } .side-line { height: 9px; margin: 0 0 17px; border-radius: 3px; background: #c8d9ce; } .side-line.active { width: 76%; background: var(--green); }
+    .editor { padding: 24px; } .editor-title { width: 45%; height: 14px; margin-bottom: 28px; border-radius: 4px; background: var(--green-dark); } .query { display: flex; align-items: center; justify-content: space-between; padding: 13px 14px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; } .query b { color: var(--orange); font-weight: 500; }
+    .rows { margin-top: 20px; border-top: 1px solid var(--line); } .row { display: grid; grid-template-columns: 1.2fr 1fr 42px; gap: 12px; padding: 15px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; } .row span:first-child { color: var(--ink); font-weight: 650; }
+    .section { padding: 76px 0; border-top: 1px solid var(--line); } .section-head { max-width: 630px; margin-bottom: 32px; } h2 { margin: 0; font-size: 36px; line-height: 1.1; letter-spacing: -.03em; } .section-head p { margin: 14px 0 0; color: var(--muted); }
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; } .feature { padding: 24px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); } .feature-index { color: var(--orange); font-size: 13px; font-weight: 800; } h3 { margin: 18px 0 8px; font-size: 19px; } .feature p { margin: 0; color: var(--muted); font-size: 15px; }
+    .download { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 34px; border-radius: 10px; background: var(--green-dark); color: #fff; } .download h2 { max-width: 620px; } .download p { margin: 10px 0 0; color: #c6ddd1; } .download .button { flex: 0 0 auto; border-color: #e8f5ed; background: #e8f5ed; color: var(--green-dark); }
+    footer { padding: 28px 0 42px; color: var(--muted); font-size: 13px; } footer .wrap { display: flex; justify-content: space-between; gap: 20px; }
+    @media (max-width: 800px) { .hero { grid-template-columns: 1fr; gap: 42px; padding: 60px 0 70px; } .features { grid-template-columns: 1fr; } .download { align-items: flex-start; flex-direction: column; } }
+    @media (max-width: 520px) { .wrap { width: min(100% - 28px, 1120px); } .nav-links { gap: 12px; } .nav-links a:first-child { display: none; } h1 { font-size: 48px; } .window-body { grid-template-columns: 78px 1fr; } .editor { padding: 16px; } .row { grid-template-columns: 1fr 42px; } .row span:nth-child(2) { display: none; } footer .wrap { flex-direction: column; } }
+  </style>
 </head>
 <body>
+  <header><div class="wrap"><nav><a class="brand" href="./"><span class="mark">S</span><span>SeekES</span></a><div class="nav-links"><a href="#features">Features</a><a href="https://github.com/newpanjing/seekes">GitHub ↗</a></div></nav></div></header>
   <main>
-    <h1>SeekES</h1>
-    <p>macOS Elasticsearch client.</p>
-    <p><a href="https://github.com/newpanjing/seekes/releases/latest/download/SeekES-latest.zip">Download the latest macOS app</a></p>
+    <section class="hero wrap"><div><p class="eyebrow">Elasticsearch · macOS</p><h1>Search your data at full speed.</h1><p class="lead">A focused desktop client for exploring indices, mapping documents, and running queries without leaving your Mac.</p><div class="actions"><a class="button" href="https://github.com/newpanjing/seekes/releases/latest/download/SeekES-latest.zip">Download for Mac</a><a class="button secondary" href="https://github.com/newpanjing/seekes/releases/latest">View releases ↗</a></div><p class="note">Free download · macOS 14 or later · Unsigned app</p></div><div class="window" aria-label="SeekES app preview"><div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div><div class="window-body"><aside class="sidebar"><div class="side-line active"></div><div class="side-line"></div><div class="side-line"></div><div class="side-line"></div><div class="side-line"></div></aside><div class="editor"><div class="editor-title"></div><div class="query"><span><b>GET</b> /products/_search</span><span>Run →</span></div><div class="rows"><div class="row"><span>_source.name</span><span>Acme Monitor</span><span>200</span></div><div class="row"><span>_source.category</span><span>Observability</span><span>200</span></div><div class="row"><span>_source.updated</span><span>2026-08-19</span><span>200</span></div></div></div></div></div></section>
+    <section id="features" class="section"><div class="wrap"><div class="section-head"><h2>Everything you need to inspect an index.</h2><p>Small, direct tools for the moments when a browser tab and a curl command are not enough.</p></div><div class="features"><article class="feature"><span class="feature-index">01</span><h3>Explore indices</h3><p>See mappings, settings, documents, and index structure in one quiet workspace.</p></article><article class="feature"><span class="feature-index">02</span><h3>Compose queries</h3><p>Run search and analysis requests with a clear response view built for iteration.</p></article><article class="feature"><span class="feature-index">03</span><h3>Stay in control</h3><p>Keep connections organized locally and move between clusters without clutter.</p></article></div></div></section>
+    <section class="section"><div class="wrap"><div class="download"><div><h2>Make your next query feel lighter.</h2><p>Download the latest SeekES build from GitHub Releases.</p></div><a class="button" href="https://github.com/newpanjing/seekes/releases/latest/download/SeekES-latest.zip">Get SeekES ↗</a></div></div></section>
   </main>
+  <footer><div class="wrap"><span>© 2026 SeekES</span><span>Built for Elasticsearch on macOS.</span></div></footer>
 </body>
 </html>
