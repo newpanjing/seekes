@@ -10,7 +10,6 @@ private enum DocumentToolbarLayout {
 struct DocumentSearchBarView: View {
     @EnvironmentObject var documentVM: DocumentViewModel
     @EnvironmentObject var indexVM: IndexViewModel
-    @State private var showCreateDocument = false
 
     private var fields: [IndexField] {
         guard let indexName = indexVM.selectedIndex?.name else { return [] }
@@ -86,20 +85,6 @@ struct DocumentSearchBarView: View {
             .controlSize(.mini)
             .help("重置查询")
 
-            Button {
-                showCreateDocument = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
-                    .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.mini)
-            .help("新建文档")
-        }
-        .sheet(isPresented: $showCreateDocument) {
-            CreateDocumentSheet(isPresented: $showCreateDocument)
-                .environmentObject(documentVM)
         }
     }
 
@@ -111,12 +96,19 @@ struct DocumentSearchBarView: View {
 }
 
 /// 为当前索引创建单个 JSON 文档，支持指定或自动生成文档 ID。
-private struct CreateDocumentSheet: View {
+struct CreateDocumentSheet: View {
     @Binding var isPresented: Bool
     @EnvironmentObject var documentVM: DocumentViewModel
+    @EnvironmentObject var indexVM: IndexViewModel
     @State private var documentID = ""
     @State private var documentJSON = "{\n\n}"
     @State private var contentMode: CreateDocumentContentMode = .json
+    @State private var uiValues: [String: String] = [:]
+
+    private var editableFields: [IndexField] {
+        guard let name = indexVM.selectedIndex?.name else { return [] }
+        return (indexVM.indexFieldsMap[name] ?? []).filter { $0.name != "_id" && $0.type != "meta" }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -153,12 +145,26 @@ private struct CreateDocumentSheet: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 150)
+                .frame(width: 190)
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
             if contentMode == .json {
                 JSONEditor(text: $documentJSON)
+            } else if contentMode == .ui {
+                Form {
+                    if editableFields.isEmpty {
+                        Text("当前索引暂无可编辑字段").foregroundColor(.secondary)
+                    } else {
+                        ForEach(editableFields) { field in
+                            TextField("\(field.name)（\(field.type)）", text: Binding(
+                                get: { uiValues[field.name, default: ""] },
+                                set: { uiValues[field.name] = $0 }
+                            ))
+                        }
+                    }
+                }
+                .formStyle(.grouped)
             } else {
                 ConsoleEditor(text: $documentJSON)
             }
@@ -171,7 +177,8 @@ private struct CreateDocumentSheet: View {
                 Spacer()
                 Button {
                     Task {
-                        if await documentVM.createDocument(id: documentID, jsonText: documentJSON) {
+                        let json = contentMode == .ui ? makeUIJSON() : documentJSON
+                        if await documentVM.createDocument(id: documentID, jsonText: json) {
                             isPresented = false
                         }
                     }
@@ -183,16 +190,42 @@ private struct CreateDocumentSheet: View {
             }
             .padding(12)
         }
-        .frame(width: 620, height: 460)
+        .frame(width: 620, height: 520)
+    }
+
+    /// 将 UI 字段值转换为文档 JSON，数值和布尔字段按类型输出原生值。
+    private func makeUIJSON() -> String {
+        var result: [String: Any] = [:]
+        for field in editableFields {
+            let value = uiValues[field.name, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { continue }
+            switch field.type {
+            case "integer": result[field.name] = Int(value) ?? value
+            case "long": result[field.name] = Int64(value) ?? value
+            case "float", "double": result[field.name] = Double(value) ?? value
+            case "boolean": result[field.name] = Bool(value) ?? value
+            default: result[field.name] = value
+            }
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted]),
+              let json = String(data: data, encoding: .utf8) else { return "{}" }
+        return json
     }
 }
 
 private enum CreateDocumentContentMode: String, CaseIterable, Identifiable {
     case json
+    case ui
     case text
 
     var id: String { rawValue }
-    var title: String { self == .json ? "JSON 编辑器" : "原文" }
+    var title: String {
+        switch self {
+        case .json: return "JSON 编辑器"
+        case .ui: return "可视化"
+        case .text: return "原文"
+        }
+    }
 }
 
 struct DocumentListView: View {
@@ -216,36 +249,9 @@ struct DocumentListView: View {
                 .controlSize(.mini)
                 .help("刷新结果")
 
-                Button {
-                    Task { await documentVM.exportAllDocuments() }
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 11, weight: .medium))
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .help("导出全部结果")
-
-                Button {
-                    documentVM.exportSelectedDocument()
-                } label: {
-                    Image(systemName: "doc.badge.arrow.down")
-                        .font(.system(size: 11, weight: .medium))
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .disabled(documentVM.selectedDocument == nil)
-                .help("导出选中文档")
-                
                 Spacer(minLength: 8)
                 
                 Menu {
-                    Button("_id", action: {
-                        documentVM.sortField = "_id"
-                        Task { await documentVM.searchDocuments() }
-                    })
                     Button("_score", action: {
                         documentVM.sortField = "_score"
                         Task { await documentVM.searchDocuments() }
@@ -460,13 +466,12 @@ struct JSONViewerTextView: View {
                         Button(action: {
                             documentVM.copyDocumentToClipboard()
                         }) {
-                            Image(systemName: "doc.on.doc")
+                            Label(documentVM.copySucceeded ? "已复制" : "复制", systemImage: documentVM.copySucceeded ? "checkmark" : "doc.on.doc")
                                 .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
-                                .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.mini)
-                        .help("复制文档 JSON")
+                        .help(documentVM.copySucceeded ? "已复制文档 JSON" : "复制文档 JSON")
                     }
                 }
             }

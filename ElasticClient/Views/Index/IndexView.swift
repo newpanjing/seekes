@@ -4,7 +4,6 @@ struct IndexView: View {
     @EnvironmentObject var indexVM: IndexViewModel
     @EnvironmentObject var documentVM: DocumentViewModel
     @EnvironmentObject var appState: AppState
-    @State private var showCreateIndex = false
     @State private var newIndexName = ""
     @State private var newIndexShards = 1
     @State private var newIndexReplicas = 1
@@ -48,7 +47,6 @@ struct IndexView: View {
                 HSplitView {
                     // Left: Index List with expandable fields
                     IndexListView(
-                        onCreate: { showCreateIndex = true },
                         onRefresh: { Task { await indexVM.refresh() } }
                     )
                         .frame(minWidth: 220, idealWidth: 220, maxWidth: 260)
@@ -73,9 +71,9 @@ struct IndexView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(NSColor.textBackgroundColor))
-        .sheet(isPresented: $showCreateIndex) {
+        .sheet(isPresented: $indexVM.showCreateIndexSheet) {
             CreateIndexSheet(
-                isPresented: $showCreateIndex,
+                isPresented: $indexVM.showCreateIndexSheet,
                 indexName: $newIndexName,
                 shards: $newIndexShards,
                 replicas: $newIndexReplicas
@@ -128,6 +126,8 @@ struct IndexDetailView: View {
 
 struct DataTabView: View {
     @EnvironmentObject var documentVM: DocumentViewModel
+    @EnvironmentObject var indexVM: IndexViewModel
+    @State private var showCreateDocument = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -135,6 +135,21 @@ struct DataTabView: View {
             DocumentSearchBarView()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
+
+            HStack {
+                Text("索引数据")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button {
+                    showCreateDocument = true
+                } label: {
+                    Label("新建文档", systemImage: "plus")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
             
             Divider()
             
@@ -154,6 +169,11 @@ struct DataTabView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
         }
+        .sheet(isPresented: $showCreateDocument) {
+            CreateDocumentSheet(isPresented: $showCreateDocument)
+                .environmentObject(documentVM)
+                .environmentObject(indexVM)
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
@@ -165,6 +185,7 @@ struct CreateIndexSheet: View {
     @Binding var replicas: Int
     @EnvironmentObject var indexVM: IndexViewModel
     @State private var mode: CreationMode = .visual
+    @State private var fields: [CreateIndexField] = []
     @State private var definitionJSON = "{\n  \"settings\": {\n    \"number_of_shards\": 1,\n    \"number_of_replicas\": 1\n  },\n  \"mappings\": {\n    \"properties\": {}\n  }\n}"
 
     private enum CreationMode: String, CaseIterable, Identifiable {
@@ -194,13 +215,57 @@ struct CreateIndexSheet: View {
                 .pickerStyle(.segmented)
 
                 if mode == .visual {
-                    Form {
-                        Stepper("主分片数: \(shards)", value: $shards, in: 1...10)
-                        Stepper("副本数: \(replicas)", value: $replicas, in: 0...5)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Stepper("主分片数: \(shards)", value: $shards, in: 1...10)
+                            Stepper("副本数: \(replicas)", value: $replicas, in: 0...5)
+                        }
+                        HStack {
+                            Text("字段").font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Button {
+                                fields.append(CreateIndexField())
+                            } label: {
+                                Label("新增字段", systemImage: "plus")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                        if fields.isEmpty {
+                            Text("暂无字段，可直接创建空索引")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            ScrollView {
+                                LazyVStack(spacing: 6) {
+                                    ForEach($fields) { $field in
+                                        HStack(spacing: 8) {
+                                            TextField("字段名", text: $field.name)
+                                                .textFieldStyle(.roundedBorder)
+                                            Picker("类型", selection: $field.type) {
+                                                ForEach(CreateIndexField.types, id: \.self) { type in
+                                                    Text(type).tag(type)
+                                                }
+                                            }
+                                            .labelsHidden()
+                                            .frame(width: 130)
+                                            Button {
+                                                fields.removeAll { $0.id == field.id }
+                                            } label: {
+                                                Image(systemName: "trash")
+                                            }
+                                            .buttonStyle(.borderless)
+                                            .foregroundColor(.red)
+                                            .help("删除字段")
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(maxHeight: 180)
+                        }
                     }
-                    .formStyle(.grouped)
                 } else {
-                    JSONEditor(text: $definitionJSON)
+                    JSONEditor(text: $definitionJSON, showsLineNumbers: false)
                         .frame(minHeight: 260)
                 }
 
@@ -225,7 +290,7 @@ struct CreateIndexSheet: View {
                 Button {
                     Task {
                         if mode == .visual {
-                            await indexVM.createIndex(name: indexName, numberOfShards: shards, numberOfReplicas: replicas)
+                            await indexVM.createIndex(name: indexName, numberOfShards: shards, numberOfReplicas: replicas, fields: fields)
                         } else {
                             await indexVM.createIndex(name: indexName, definitionJSON: definitionJSON)
                         }
@@ -242,8 +307,17 @@ struct CreateIndexSheet: View {
             }
             .padding()
         }
-        .frame(width: 600, height: 480)
+        .frame(width: 620, height: 560, alignment: .topLeading)
     }
+}
+
+/// 可视化创建索引时的一行字段配置。
+struct CreateIndexField: Identifiable {
+    let id = UUID()
+    var name = ""
+    var type = "keyword"
+
+    static let types = ["keyword", "text", "integer", "long", "float", "double", "boolean", "date", "ip", "object", "nested"]
 }
 
 struct IndexInfoHeaderView: View {

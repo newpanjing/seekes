@@ -310,6 +310,12 @@ struct ConsoleEditor: NSViewRepresentable {
 /// 可编辑 JSON 文本框；输入过程中保持 JSON 语法颜色，格式化由上层按钮触发。
 struct JSONEditor: NSViewRepresentable {
     @Binding var text: String
+    let showsLineNumbers: Bool
+
+    init(text: Binding<String>, showsLineNumbers: Bool = true) {
+        _text = text
+        self.showsLineNumbers = showsLineNumbers
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -317,8 +323,9 @@ struct JSONEditor: NSViewRepresentable {
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
-        scrollView.hasVerticalRuler = true
-        scrollView.rulersVisible = true
+        scrollView.autohidesScrollers = true
+        scrollView.hasVerticalRuler = showsLineNumbers
+        scrollView.rulersVisible = showsLineNumbers
         scrollView.drawsBackground = false
         let textView = NSTextView(frame: .zero)
         textView.isEditable = true
@@ -339,7 +346,9 @@ struct JSONEditor: NSViewRepresentable {
         textView.isAutomaticTextReplacementEnabled = false
         textView.string = text
         scrollView.documentView = textView
-        scrollView.verticalRulerView = JSONLineNumberRulerView(scrollView: scrollView, textView: textView)
+        if showsLineNumbers {
+            scrollView.verticalRulerView = JSONLineNumberRulerView(scrollView: scrollView, textView: textView)
+        }
         applySyntax(to: textView)
         return scrollView
     }

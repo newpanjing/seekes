@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// 独立查询页，支持原始 DSL 与可视化条件，并展示高亮后的原始响应。
 struct QueryView: View {
@@ -17,6 +18,13 @@ struct QueryView: View {
     @State private var formattedResponse = ""
     @State private var resultPresentation: QueryResultPresentation = .json
     @State private var inputPresentation: QueryInputPresentation = .editor
+    @State private var currentPage = 1
+    @State private var pageSize = 10
+    @State private var totalResults = 0
+
+    private var totalPages: Int {
+        max(1, (totalResults + pageSize - 1) / pageSize)
+    }
 
     private var fields: [IndexField] {
         indexVM.indexFieldsMap[selectedIndex] ?? []
@@ -44,7 +52,7 @@ struct QueryView: View {
                 .frame(width: 120)
                 Spacer()
                 Button {
-                    Task { await executeQuery() }
+                    Task { await executeQuery(resetPage: true) }
                 } label: {
                     Label(isLoading ? "查询中" : "查询", systemImage: isLoading ? "hourglass" : "magnifyingglass")
                 }
@@ -150,16 +158,13 @@ struct QueryView: View {
                     if let errorMessage {
                         Text(errorMessage).foregroundColor(.red).padding(.horizontal, 12).padding(.top, 8)
                     }
-                    if resultPresentation == .json {
+                    ZStack {
                         CollapsibleJSONView(jsonText: formattedResponse)
-                    } else {
-                        ScrollView([.horizontal, .vertical]) {
-                            Text(rawResponse)
-                                .font(.system(size: 12, design: .monospaced))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(12)
-                        }
+                            .opacity(resultPresentation == .json ? 1 : 0)
+                            .allowsHitTesting(resultPresentation == .json)
+                        ResponseViewer(attributedText: formattedTextResponse)
+                            .opacity(resultPresentation == .text ? 1 : 0)
+                            .allowsHitTesting(resultPresentation == .text)
                     }
                 }
                 .background(Color(NSColor.textBackgroundColor))
@@ -172,6 +177,43 @@ struct QueryView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Spacer()
+                if queryDuration != nil {
+                    Button {
+                        guard currentPage > 1 else { return }
+                        currentPage -= 1
+                        Task { await executeQuery(resetPage: false) }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(currentPage == 1 || isLoading)
+                    Text("第 \(currentPage) / \(totalPages) 页，共 \(totalResults.formatted()) 条")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Button {
+                        guard currentPage < totalPages else { return }
+                        currentPage += 1
+                        Task { await executeQuery(resetPage: false) }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(currentPage >= totalPages || isLoading)
+                    Menu {
+                        ForEach([10, 20, 50], id: \.self) { size in
+                            Button("\(size) 条") {
+                                pageSize = size
+                                currentPage = 1
+                                Task { await executeQuery(resetPage: false) }
+                            }
+                        }
+                    } label: {
+                        Text("\(pageSize) 条/页")
+                    }
+                    .menuStyle(.borderlessButton)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 7)
@@ -179,6 +221,8 @@ struct QueryView: View {
         }
         .onAppear { selectInitialIndex() }
         .onChange(of: selectedIndex) { _, name in
+            currentPage = 1
+            totalResults = 0
             if let index = indexVM.indices.first(where: { $0.name == name }) {
                 indexVM.selectIndex(index)
             }
@@ -209,18 +253,35 @@ struct QueryView: View {
         }
     }
 
-    private func executeQuery() async {
+    /// 原文以原生文本视图展示，避免 SwiftUI 对大 JSON 进行全量布局导致切换卡顿。
+    private var formattedTextResponse: NSAttributedString {
+        NSAttributedString(
+            string: formattedResponse,
+            attributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+                .foregroundColor: NSColor.labelColor
+            ]
+        )
+    }
+
+    private func executeQuery(resetPage: Bool) async {
         let startedAt = Date()
         isLoading = true
         errorMessage = nil
+        if resetPage { currentPage = 1 }
         if queryMode == .builder { rawQuery = generatedQuery }
         do {
-            let data = try await ESAPIClient.shared.executeRawQuery(index: selectedIndex, dsl: rawQuery)
+            let dsl = try pagedQueryDSL()
+            let data = try await ESAPIClient.shared.executeRawQuery(index: selectedIndex, dsl: dsl)
             rawResponse = String(decoding: data, as: UTF8.self)
             queryDuration = Date().timeIntervalSince(startedAt)
             let object = try JSONSerialization.jsonObject(with: data)
             let prettyData = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted])
             formattedResponse = String(decoding: prettyData, as: UTF8.self)
+            let response = object as? [String: Any]
+            let hits = response?["hits"] as? [String: Any]
+            let total = hits?["total"] as? [String: Any]
+            totalResults = total?["value"] as? Int ?? 0
         } catch {
             queryDuration = Date().timeIntervalSince(startedAt)
             rawResponse = error.localizedDescription
@@ -228,6 +289,18 @@ struct QueryView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// 为独立查询页统一注入分页，保证每次请求都有明确的 from 与 size。
+    private func pagedQueryDSL() throws -> String {
+        guard let data = rawQuery.data(using: .utf8),
+              var query = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ESError.invalidBody
+        }
+        query["from"] = (currentPage - 1) * pageSize
+        query["size"] = pageSize
+        let formatted = try JSONSerialization.data(withJSONObject: query, options: [.prettyPrinted])
+        return String(decoding: formatted, as: UTF8.self)
     }
 
     private func formatQuery() {

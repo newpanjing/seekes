@@ -203,15 +203,23 @@ class IndexViewModel: ObservableObject {
         isLoading = false
     }
     
+    /// 使用可视化配置创建索引，并将字段行转换为 Elasticsearch properties。
     @MainActor
-    func createIndex(name: String, numberOfShards: Int = 1, numberOfReplicas: Int = 1) async {
+    func createIndex(name: String, numberOfShards: Int = 1, numberOfReplicas: Int = 1, fields: [CreateIndexField] = []) async {
         isLoading = true
         do {
             let settings: [String: Any] = [
                 "number_of_shards": numberOfShards,
                 "number_of_replicas": numberOfReplicas
             ]
-            _ = try await ESAPIClient.shared.createIndex(name: name, settings: settings)
+            let properties = fields.reduce(into: [String: Any]()) { result, field in
+                let trimmedName = field.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmedName.isEmpty {
+                    result[trimmedName] = ["type": field.type]
+                }
+            }
+            let mappings: [String: Any]? = properties.isEmpty ? nil : ["properties": properties]
+            _ = try await ESAPIClient.shared.createIndex(name: name, mappings: mappings, settings: settings)
             await loadIndices()
             showCreateIndexSheet = false
         } catch {

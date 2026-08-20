@@ -21,8 +21,8 @@ class DocumentViewModel: ObservableObject {
     @Published var documentOperation: DocumentOperation = .view
     @Published var isEditing: Bool = false
     @Published var showOperationPanel: Bool = true
-    @Published var sortField: String = ""
-    @Published var sortOrder: String = "asc"
+    @Published var sortField: String = "_score"
+    @Published var sortOrder: String = "desc"
     @Published var editJsonText: String = ""
     @Published var showImportSheet: Bool = false
     @Published var consoleText: String = "GET /_cat/indices?v"
@@ -32,6 +32,7 @@ class DocumentViewModel: ObservableObject {
     @Published var lastQueryJSON: String = ""
     @Published var lastResponseJSON: String = ""
     @Published var lastQueryDuration: TimeInterval?
+    @Published var copySucceeded = false
     
     private var currentIndex: String?
     private var cancellables = Set<AnyCancellable>()
@@ -162,81 +163,6 @@ class DocumentViewModel: ObservableObject {
         }
         
         isLoading = false
-    }
-
-    /// 导出当前查询命中的全部文档，按批次读取以避免只导出当前页。
-    @MainActor
-    func exportAllDocuments() async {
-        guard let indexName = currentIndex, isConnected else { return }
-        guard let query = queryForCurrentInput() else { return }
-
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "\(indexName)-results.json"
-        panel.allowedFileTypes = ["json"]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        do {
-            var exported: [[String: Any]] = []
-            let batchSize = 1_000
-            var from = 0
-            while true {
-                let response = try await ESAPIClient.shared.searchDocuments(
-                    index: indexName,
-                    query: query,
-                    from: from,
-                    size: batchSize,
-                    sort: sortField.isEmpty ? nil : [[sortField: ["order": sortOrder]]]
-                )
-                exported.append(contentsOf: response.hits.hits.map(exportObject))
-                if response.hits.hits.count < batchSize { break }
-                from += batchSize
-            }
-            try writeExport(exported, to: url)
-        } catch {
-            errorMessage = "导出失败：\(error.localizedDescription)"
-        }
-    }
-
-    /// 导出当前选中的单个文档。
-    @MainActor
-    func exportSelectedDocument() {
-        guard let document = selectedDocument else { return }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "\(document.id).json"
-        panel.allowedFileTypes = ["json"]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try writeExport(exportObject(document), to: url)
-        } catch {
-            errorMessage = "导出失败：\(error.localizedDescription)"
-        }
-    }
-
-    /// 复用当前查询输入，确保导出范围与结果列表一致。
-    private func queryForCurrentInput() -> [String: Any]? {
-        if queryMode == .builder { return makeBuilderQuery() }
-        let text = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return nil }
-        guard let data = text.data(using: .utf8),
-              let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            errorMessage = "JSON 格式错误"
-            return nil
-        }
-        return parsed["query"] as? [String: Any] ?? parsed
-    }
-
-    /// 将搜索命中转换为可直接保存的 JSON 对象。
-    private func exportObject(_ hit: DocumentHit) -> [String: Any] {
-        var result: [String: Any] = ["_index": hit.index, "_id": hit.id]
-        if let score = hit.score { result["_score"] = score }
-        result["_source"] = sourceDictionary(from: hit.source ?? [:])
-        return result
-    }
-
-    /// 格式化并写入导出文件。
-    private func writeExport(_ value: Any, to url: URL) throws {
-        let data = try JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: url, options: .atomic)
     }
 
     /// 根据 UI 中选择的字段、操作符和值构建 Elasticsearch Query DSL。
@@ -387,6 +313,7 @@ class DocumentViewModel: ObservableObject {
         isEditing = (op == .update)
     }
     
+    @MainActor
     func copyDocumentToClipboard() {
         guard let doc = selectedDocumentDetail,
               let source = doc.source else { return }
@@ -396,6 +323,11 @@ class DocumentViewModel: ObservableObject {
            let jsonString = String(data: jsonData, encoding: .utf8) {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(jsonString, forType: .string)
+            copySucceeded = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.5))
+                copySucceeded = false
+            }
         }
     }
     

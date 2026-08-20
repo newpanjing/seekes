@@ -2,7 +2,6 @@ import SwiftUI
 
 struct IndexListView: View {
     @EnvironmentObject var indexVM: IndexViewModel
-    let onCreate: () -> Void
     let onRefresh: () -> Void
     
     var body: some View {
@@ -31,8 +30,10 @@ struct IndexListView: View {
                                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                         )
                 )
-                indexActionButton(systemImage: "plus", help: "新建索引", action: onCreate)
                 indexActionButton(systemImage: "arrow.clockwise", help: "刷新索引", action: onRefresh)
+                indexActionButton(systemImage: "plus", help: "新建索引", action: {
+                    indexVM.showCreateIndexSheet = true
+                })
             }
             .padding(.horizontal, 10)
             .padding(.top, 10)
