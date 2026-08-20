@@ -1,8 +1,16 @@
 import SwiftUI
 
+/// 数据浏览工具栏的统一尺寸，避免同一操作区出现不同规格的按钮。
+private enum DocumentToolbarLayout {
+    static let controlHeight: CGFloat = 24
+    static let iconSize: CGFloat = 11
+    static let controlSpacing: CGFloat = 4
+}
+
 struct DocumentSearchBarView: View {
     @EnvironmentObject var documentVM: DocumentViewModel
     @EnvironmentObject var indexVM: IndexViewModel
+    @State private var showCreateDocument = false
 
     private var fields: [IndexField] {
         guard let indexName = indexVM.selectedIndex?.name else { return [] }
@@ -10,21 +18,22 @@ struct DocumentSearchBarView: View {
     }
     
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DocumentToolbarLayout.controlSpacing) {
             Picker("查询模式", selection: $documentVM.queryMode) {
                 ForEach(DocumentQueryMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
             }
             .labelsHidden()
-            .frame(width: 100)
+            .font(.system(size: DocumentToolbarLayout.iconSize))
+            .frame(width: 104, height: DocumentToolbarLayout.controlHeight)
 
             if documentVM.queryMode == .json {
                 TextField("输入查询 DSL（JSON 格式），留空查询所有文档", text: $documentVM.searchQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13, design: .monospaced))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .frame(height: DocumentToolbarLayout.controlHeight)
                     .background(queryInputBackground)
             } else {
                 Picker("字段", selection: $documentVM.queryField) {
@@ -33,15 +42,19 @@ struct DocumentSearchBarView: View {
                         Text("\(field.name) (\(field.type))").tag(field.name)
                     }
                 }
-                .frame(width: 180)
+                .font(.system(size: DocumentToolbarLayout.iconSize))
+                .frame(width: 180, height: DocumentToolbarLayout.controlHeight)
                 Picker("操作符", selection: $documentVM.queryOperator) {
                     ForEach(DocumentQueryOperator.allCases) { item in
                         Text(item.title).tag(item)
                     }
                 }
-                .frame(width: 105)
+                .font(.system(size: DocumentToolbarLayout.iconSize))
+                .frame(width: 105, height: DocumentToolbarLayout.controlHeight)
                 TextField("查询值", text: $documentVM.queryValue)
                     .textFieldStyle(.roundedBorder)
+                    .font(.system(size: DocumentToolbarLayout.iconSize))
+                    .frame(height: DocumentToolbarLayout.controlHeight)
             }
             
             Button(action: {
@@ -49,18 +62,13 @@ struct DocumentSearchBarView: View {
                     await documentVM.searchDocuments()
                 }
             }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                    Text("搜索")
-                }
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-                .background(Color.blue)
-                .cornerRadius(6)
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
+                    .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.mini)
+            .help("搜索文档")
             
             Button(action: {
                 documentVM.searchQuery = ""
@@ -71,15 +79,27 @@ struct DocumentSearchBarView: View {
                 }
             }) {
                 Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 13))
-                    .foregroundColor(.primary)
-                    .frame(width: 36, height: 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                    )
+                    .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
+                    .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .help("重置查询")
+
+            Button {
+                showCreateDocument = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
+                    .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .help("新建文档")
+        }
+        .sheet(isPresented: $showCreateDocument) {
+            CreateDocumentSheet(isPresented: $showCreateDocument)
+                .environmentObject(documentVM)
         }
     }
 
@@ -88,6 +108,91 @@ struct DocumentSearchBarView: View {
             .fill(Color(NSColor.controlBackgroundColor))
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.2), lineWidth: 1))
     }
+}
+
+/// 为当前索引创建单个 JSON 文档，支持指定或自动生成文档 ID。
+private struct CreateDocumentSheet: View {
+    @Binding var isPresented: Bool
+    @EnvironmentObject var documentVM: DocumentViewModel
+    @State private var documentID = ""
+    @State private var documentJSON = "{\n\n}"
+    @State private var contentMode: CreateDocumentContentMode = .json
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("新建文档").font(.headline)
+                Spacer()
+                Button { isPresented = false } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.bordered)
+                    .help("关闭")
+            }
+            .padding(12)
+            Divider()
+            VStack(alignment: .leading, spacing: 8) {
+                Text("文档 ID（可选）")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+                TextField("留空则自动生成", text: $documentID)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(height: 28)
+                if let error = documentVM.errorMessage {
+                    Text(error).font(.caption).foregroundColor(.red)
+                }
+            }
+            .padding(12)
+            HStack {
+                Text("文档内容")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Picker("内容格式", selection: $contentMode) {
+                    ForEach(CreateDocumentContentMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 150)
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
+            if contentMode == .json {
+                JSONEditor(text: $documentJSON)
+            } else {
+                ConsoleEditor(text: $documentJSON)
+            }
+            Divider()
+            HStack {
+                Button { isPresented = false } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.bordered)
+                    .help("取消")
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button {
+                    Task {
+                        if await documentVM.createDocument(id: documentID, jsonText: documentJSON) {
+                            isPresented = false
+                        }
+                    }
+                } label: { Image(systemName: "checkmark") }
+                .buttonStyle(.borderedProminent)
+                .help("创建")
+                .disabled(documentVM.isLoading)
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .frame(width: 620, height: 460)
+    }
+}
+
+private enum CreateDocumentContentMode: String, CaseIterable, Identifiable {
+    case json
+    case text
+
+    var id: String { rawValue }
+    var title: String { self == .json ? "JSON 编辑器" : "原文" }
 }
 
 struct DocumentListView: View {
@@ -99,6 +204,40 @@ struct DocumentListView: View {
                 Text("共 \(documentVM.totalResults.formatted()) 条")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
+
+                Button {
+                    Task { await documentVM.searchDocuments() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .help("刷新结果")
+
+                Button {
+                    Task { await documentVM.exportAllDocuments() }
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .help("导出全部结果")
+
+                Button {
+                    documentVM.exportSelectedDocument()
+                } label: {
+                    Image(systemName: "doc.badge.arrow.down")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .disabled(documentVM.selectedDocument == nil)
+                .help("导出选中文档")
                 
                 Spacer(minLength: 8)
                 
@@ -135,7 +274,7 @@ struct DocumentListView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.vertical, 5)
             
             Divider()
             
@@ -178,6 +317,25 @@ struct DocumentListView: View {
                             .onTapGesture {
                                 documentVM.selectDocument(doc)
                             }
+                            .contextMenu {
+                                Button("查看") { documentVM.selectDocument(doc) }
+                                Button("编辑") {
+                                    documentVM.selectDocument(doc)
+                                    documentVM.startEditing()
+                                }
+                                Divider()
+                                Button("删除", role: .destructive) {
+                                    documentVM.selectDocument(doc)
+                                    NSAlert.showConfirmation(
+                                        title: "删除文档",
+                                        message: "确定要删除文档 \(doc.id) 吗？此操作不可撤销。"
+                                    ) { confirmed in
+                                        if confirmed {
+                                            Task { await documentVM.deleteDocument() }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -216,7 +374,7 @@ struct DocumentListRow: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 10)
+        .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(isSelected ? Color.blue : Color.clear)
@@ -241,96 +399,79 @@ struct JSONViewerTextView: View {
                 
                 Spacer(minLength: 8)
                 
-                if documentVM.isEditing {
-                    Button(action: {
-                        documentVM.cancelEditing()
-                    }) {
-                        Text("取消")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 5)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button(action: {
-                        Task {
-                            await documentVM.saveDocument()
+                HStack(spacing: DocumentToolbarLayout.controlSpacing) {
+                    if documentVM.isEditing {
+                        Button(action: {
+                            documentVM.cancelEditing()
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
+                                .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
                         }
-                    }) {
-                        Text("保存")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 5)
-                            .background(Color.blue)
-                            .cornerRadius(6)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.leading, 8)
-                } else {
-                    Button(action: {
-                        documentVM.startEditing()
-                    }) {
-                        Text("编辑")
-                            .font(.system(size: 12))
-                            .foregroundColor(.blue)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 5)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button(action: {
-                        NSAlert.showConfirmation(
-                            title: "删除文档",
-                            message: "确定要删除文档 \(documentVM.selectedDocument?.id ?? "") 吗？此操作不可撤销。"
-                        ) { confirmed in
-                            if confirmed {
-                                Task {
-                                    await documentVM.deleteDocument()
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .help("取消编辑")
+
+                        Button(action: {
+                            Task {
+                                await documentVM.saveDocument()
+                            }
+                        }) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
+                                .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.mini)
+                        .help("保存文档")
+                    } else {
+                        Button(action: {
+                            documentVM.startEditing()
+                        }) {
+                            Image(systemName: "pencil")
+                                .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
+                                .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .help("编辑文档")
+
+                        Button(action: {
+                            NSAlert.showConfirmation(
+                                title: "删除文档",
+                                message: "确定要删除文档 \(documentVM.selectedDocument?.id ?? "") 吗？此操作不可撤销。"
+                            ) { confirmed in
+                                if confirmed {
+                                    Task {
+                                        await documentVM.deleteDocument()
+                                    }
                                 }
                             }
+                        }) {
+                            Image(systemName: "trash")
+                                .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
+                                .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
                         }
-                    }) {
-                        Text("删除")
-                            .font(.system(size: 12))
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 5)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.red.opacity(0.5), lineWidth: 1)
-                            )
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .tint(.red)
+                        .help("删除文档")
+
+                        Button(action: {
+                            documentVM.copyDocumentToClipboard()
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: DocumentToolbarLayout.iconSize, weight: .medium))
+                                .frame(width: DocumentToolbarLayout.controlHeight, height: DocumentToolbarLayout.controlHeight)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .help("复制文档 JSON")
                     }
-                    .buttonStyle(.plain)
-                    .padding(.leading, 8)
-                    
-                    Button(action: {
-                        documentVM.copyDocumentToClipboard()
-                    }) {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                            .frame(width: 30, height: 28)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.leading, 8)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
             
             Divider()
             
@@ -353,7 +494,7 @@ struct JSONViewerTextView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 } else {
-                    ResponseViewer(attributedText: documentVM.getDocumentJSON())
+                    CollapsibleJSONView(jsonText: documentVM.documentJSONString())
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
@@ -369,6 +510,12 @@ struct DocumentPaginationView: View {
         HStack {
             Text("检索结果 (\(documentVM.totalResults.formatted()))")
                 .font(.system(size: 13, weight: .medium))
+
+            if let duration = documentVM.lastQueryDuration {
+                Text("ES \(documentVM.took) ms · 总计 \(Int((duration * 1000).rounded())) ms")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
             
             Spacer(minLength: 12)
             
@@ -381,9 +528,12 @@ struct DocumentPaginationView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 11))
                         .foregroundColor(documentVM.currentPage > 1 ? .primary : .secondary)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 36, height: 32)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .help("上一页")
                 .disabled(documentVM.currentPage <= 1)
                 
                 let startPage = max(1, documentVM.currentPage - 2)
@@ -396,17 +546,22 @@ struct DocumentPaginationView: View {
                     }) {
                         Text("\(page)")
                             .font(.system(size: 12, weight: documentVM.currentPage == page ? .semibold : .regular))
-                            .foregroundColor(documentVM.currentPage == page ? .white : .primary)
-                            .frame(width: 28, height: 28)
+                            .foregroundColor(documentVM.currentPage == page ? .accentColor : .primary)
+                            .frame(width: 36, height: 32)
+                            .contentShape(Rectangle())
                             .background(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(documentVM.currentPage == page ? Color.blue : Color.clear)
+                                    .fill(documentVM.currentPage == page ? Color.accentColor.opacity(0.12) : Color.clear)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(documentVM.currentPage == page ? Color.accentColor.opacity(0.45) : .clear, lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
                 }
                 
-                if documentVM.totalPages > 5 {
+                if endPage < documentVM.totalPages {
                     Text("...")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
@@ -418,7 +573,8 @@ struct DocumentPaginationView: View {
                         Text("\(documentVM.totalPages)")
                             .font(.system(size: 12))
                             .foregroundColor(.primary)
-                            .frame(width: 28, height: 28)
+                            .frame(width: 36, height: 32)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -431,9 +587,12 @@ struct DocumentPaginationView: View {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11))
                         .foregroundColor(documentVM.currentPage < documentVM.totalPages ? .primary : .secondary)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 36, height: 32)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .help("下一页")
                 .disabled(documentVM.currentPage >= documentVM.totalPages)
             }
             .background(

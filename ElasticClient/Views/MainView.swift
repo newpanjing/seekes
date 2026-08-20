@@ -4,25 +4,37 @@ struct MainView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var indexVM = IndexViewModel()
     @StateObject private var documentVM = DocumentViewModel()
-    @State private var showConnectionManager = false
+    @State private var showConnectionEditor = false
+    @State private var editingConnection: Connection?
     @State private var showSettings = false
+    @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $sidebarVisibility) {
             SidebarView(
-                showConnectionManager: $showConnectionManager,
+                showConnectionEditor: $showConnectionEditor,
+                editingConnection: $editingConnection,
                 showSettings: $showSettings
             )
             .environmentObject(appState)
             .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 300)
         } detail: {
-            Group {
+            VStack(spacing: 0) {
+                if appState.isConnected {
+                    WorkspaceHeader(
+                        selectedItem: $appState.selectedSidebarItem,
+                        leadingPadding: sidebarVisibility == .detailOnly ? 184 : 20
+                    )
+                        .environmentObject(appState)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: 56)
+                    Divider()
+                }
+
                 if !appState.isConnected && appState.connections.isEmpty {
-                    WelcomeView(showConnectionManager: $showConnectionManager)
+                    WelcomeView(showConnectionEditor: $showConnectionEditor)
                 } else {
                     switch appState.selectedSidebarItem {
-                    case .connection:
-                        ConnectionManagementView()
                     case .overview:
                         OverviewView()
                             .environmentObject(indexVM)
@@ -30,9 +42,11 @@ struct MainView: View {
                         IndexView()
                             .environmentObject(indexVM)
                             .environmentObject(documentVM)
-                    case .console:
-                        DevToolsView()
+                    case .query:
+                        QueryView()
                             .environmentObject(indexVM)
+                    case .console:
+                        OverviewView().environmentObject(indexVM)
                     case .analyzer:
                         AnalyzerView()
                             .environmentObject(indexVM)
@@ -45,16 +59,13 @@ struct MainView: View {
                     }
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if appState.currentConnection != nil {
-                    WorkspaceTabBar(selectedItem: $appState.selectedSidebarItem)
-                }
-            }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .ignoresSafeArea(.container, edges: .top)
+            .padding(.top, -40)
         }
         .background(Color(NSColor.controlBackgroundColor))
-        .sheet(isPresented: $showConnectionManager) {
-            ConnectionManagementView()
+        .sheet(isPresented: $showConnectionEditor) {
+            ConnectionEditView(connection: $editingConnection)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -62,52 +73,42 @@ struct MainView: View {
         .onChange(of: appState.isConnected) { _, _ in
             NotificationCenter.default.post(name: .connectionStatusChanged, object: nil)
         }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button { showSettings = true } label: {
-                    Label("设置", systemImage: "gearshape")
-                }
-            }
-        }
     }
+
 }
 
 struct WelcomeView: View {
-    @Binding var showConnectionManager: Bool
+    @Binding var showConnectionEditor: Bool
     
     var body: some View {
-        VStack(spacing: 24) {
-            ESLogoView(size: 80)
+        VStack(spacing: 16) {
+            AppLogoView(size: 56)
             
-            VStack(spacing: 8) {
-                Text("欢迎使用 SeekES")
-                    .font(.system(size: 28, weight: .bold))
-                Text("请先添加 Elasticsearch 连接开始使用")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-            }
+            Text("请先添加 Elasticsearch 连接")
+                .font(.title3)
+                .foregroundColor(.secondary)
             
-            Button(action: { showConnectionManager = true }) {
+            Button(action: { showConnectionEditor = true }) {
                 HStack(spacing: 8) {
                     Image(systemName: "plus.circle.fill")
                     Text("添加连接")
                 }
-                .font(.headline)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
+                .font(.system(size: 14, weight: .semibold))
+                .padding(.horizontal, 16)
+                .frame(height: 36)
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.textBackgroundColor))
     }
 }
 
-/// 连接建立后在内容区顶部提供功能切换，侧栏仅负责连接选择。
-struct WorkspaceTabBar: View {
+/// 顶部功能切换栏。
+struct WorkspaceHeader: View {
     @Binding var selectedItem: SidebarItem
-    private let items: [SidebarItem] = [.overview, .indices, .console, .analyzer]
+    let leadingPadding: CGFloat
+    private let items: [SidebarItem] = [.overview, .indices, .query, .analyzer]
 
     var body: some View {
         HStack(spacing: 4) {
@@ -115,20 +116,34 @@ struct WorkspaceTabBar: View {
                 Button {
                     selectedItem = item
                 } label: {
-                    Label(item.title, systemImage: item.iconName)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(selectedItem == item ? Color.accentColor.opacity(0.14) : .clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    VStack(spacing: 3) {
+                        Image(systemName: item.iconName)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(iconColor(for: item))
+                            .frame(height: 18)
+                        Text(item.title)
+                            .font(.system(size: 13, weight: selectedItem == item ? .semibold : .regular))
+                    }
+                    .frame(width: 76, height: 56)
+                    .contentShape(Rectangle())
+                    .background(selectedItem == item ? Color.accentColor.opacity(0.14) : .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
             }
-            Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.bar)
-        .overlay(alignment: .bottom) { Divider() }
+        .padding(.leading, leadingPadding)
+    }
+
+    /// 为功能入口提供稳定颜色，便于快速区分模块。
+    private func iconColor(for item: SidebarItem) -> Color {
+        switch item {
+        case .overview: return .blue
+        case .indices: return .teal
+        case .query: return .purple
+        case .analyzer: return .orange
+        default: return .secondary
+        }
     }
 }
 

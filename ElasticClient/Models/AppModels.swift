@@ -1,9 +1,9 @@
-import Foundation
+import SwiftUI
 
 enum SidebarItem: Hashable, Identifiable {
-    case connection
     case overview
     case indices
+    case query
     case console
     case analyzer
     case favorite(String)
@@ -11,9 +11,9 @@ enum SidebarItem: Hashable, Identifiable {
     
     var id: String {
         switch self {
-        case .connection: return "connection"
         case .overview: return "overview"
         case .indices: return "indices"
+        case .query: return "query"
         case .console: return "console"
         case .analyzer: return "analyzer"
         case .favorite(let name): return "favorite_\(name)"
@@ -21,23 +21,23 @@ enum SidebarItem: Hashable, Identifiable {
         }
     }
     
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
-        case .connection: return "连接"
         case .overview: return "概览"
         case .indices: return "索引"
+        case .query: return "查询"
         case .console: return "控制台"
         case .analyzer: return "分词测试"
-        case .favorite(let name): return name
+        case .favorite(let name): return LocalizedStringKey(name)
         case .settings: return "设置"
         }
     }
     
     var iconName: String {
         switch self {
-        case .connection: return "network"
         case .overview: return "square.grid.2x2"
         case .indices: return "tablecells"
+        case .query: return "magnifyingglass"
         case .console: return "wrench.and.screwdriver"
         case .analyzer: return "text.viewfinder"
         case .favorite: return "square.grid.3x3"
@@ -53,6 +53,8 @@ enum IndexTab: String, CaseIterable, Identifiable {
     case stats = "统计信息"
     
     var id: String { rawValue }
+
+    var title: LocalizedStringKey { LocalizedStringKey(rawValue) }
 }
 
 enum DocumentOperation {
@@ -68,7 +70,7 @@ enum DocumentQueryMode: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .json: return "JSON 查询"
         case .builder: return "条件查询"
@@ -84,7 +86,7 @@ enum DocumentQueryOperator: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .match: return "匹配"
         case .term: return "精确匹配"

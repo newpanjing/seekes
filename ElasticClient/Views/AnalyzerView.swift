@@ -42,27 +42,11 @@ struct AnalyzerView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("分词测试")
-                        .font(.system(size: 24, weight: .bold))
-                    Text("使用 Elasticsearch Analyze API 测试文本分词效果")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
-                Spacer(minLength: 12)
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-            
-            Divider()
-            
             // Content
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 12) {
                     // Mode Selection
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("分词模式")
                             .font(.headline)
                         
@@ -144,7 +128,7 @@ struct AnalyzerView: View {
                         
                         TextEditor(text: $inputText)
                             .font(.system(size: 14))
-                            .frame(minHeight: 120, maxHeight: 200)
+                            .frame(minHeight: 80, maxHeight: 140)
                             .padding(8)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
@@ -159,25 +143,12 @@ struct AnalyzerView: View {
                                 await performAnalyze()
                             }
                         }) {
-                            HStack(spacing: 6) {
-                                if isAnalyzing {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                } else {
-                                    Image(systemName: "play.fill")
-                                }
-                                Text("开始分词")
-                            }
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(Color.blue)
-                            .cornerRadius(6)
+                            Label(isAnalyzing ? "分词中" : "开始分词", systemImage: isAnalyzing ? "hourglass" : "play.fill")
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderedProminent)
                         .contentShape(Rectangle())
                         .disabled(isAnalyzing || inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .help("开始分词")
                         
                         if let error = errorMessage {
                             Text(error)
@@ -271,9 +242,10 @@ struct AnalyzerView: View {
                         }
                     }
                 }
-                .padding(24)
+                .padding(16)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(NSColor.textBackgroundColor))

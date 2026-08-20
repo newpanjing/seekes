@@ -22,18 +22,6 @@ struct IndexView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
-                // Top Header
-                IndexHeaderView(
-                    showCreateIndex: $showCreateIndex,
-                    onRefresh: {
-                        Task {
-                            await indexVM.refresh()
-                        }
-                    }
-                )
-                
-                Divider()
-                
                 // Error message
                 if let error = indexVM.errorMessage {
                     HStack(alignment: .top) {
@@ -43,11 +31,13 @@ struct IndexView: View {
                             .font(.callout)
                             .foregroundColor(.orange)
                         Spacer(minLength: 12)
-                        Button("重试") {
+                        Button {
                             Task {
                                 await indexVM.loadIndices()
                             }
-                        }
+                        } label: { Label("重试", systemImage: "arrow.clockwise") }
+                        .buttonStyle(.bordered)
+                        .help("重试")
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 8)
@@ -57,8 +47,11 @@ struct IndexView: View {
                 // Main Content
                 HSplitView {
                     // Left: Index List with expandable fields
-                    IndexListView()
-                        .frame(minWidth: 220, idealWidth: 280)
+                    IndexListView(
+                        onCreate: { showCreateIndex = true },
+                        onRefresh: { Task { await indexVM.refresh() } }
+                    )
+                        .frame(minWidth: 220, idealWidth: 220, maxWidth: 260)
                     
                     // Right: Content Area
                     if indexVM.selectedIndex != nil {
@@ -85,13 +78,7 @@ struct IndexView: View {
                 isPresented: $showCreateIndex,
                 indexName: $newIndexName,
                 shards: $newIndexShards,
-                replicas: $newIndexReplicas,
-                onCreate: {
-                    Task {
-                        await indexVM.createIndex(name: newIndexName, numberOfShards: newIndexShards, numberOfReplicas: newIndexReplicas)
-                        newIndexName = ""
-                    }
-                }
+                replicas: $newIndexReplicas
             )
         }
         .onChange(of: indexVM.selectedIndex) { _, newIndex in
@@ -146,80 +133,28 @@ struct DataTabView: View {
         VStack(spacing: 0) {
             // Search Bar
             DocumentSearchBarView()
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
             
             Divider()
             
             // Document List + Detail
             HSplitView {
                 DocumentListView()
-                    .frame(minWidth: 200, idealWidth: 280)
+                    .frame(minWidth: 180, idealWidth: 220, maxWidth: 240)
                 
                 JSONViewerTextView()
-                    .frame(minWidth: 300)
+                    .frame(minWidth: 500)
             }
             
             Divider()
             
             // Pagination
             DocumentPaginationView()
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-struct IndexHeaderView: View {
-    @Binding var showCreateIndex: Bool
-    let onRefresh: () -> Void
-    
-    var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("索引")
-                    .font(.system(size: 24, weight: .bold))
-                Text("管理和浏览 Elasticsearch 索引，点击展开箭头查看字段")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer(minLength: 12)
-            
-            HStack(spacing: 10) {
-                Button(action: { showCreateIndex = true }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                        Text("新建索引")
-                    }
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(Color.blue)
-                    .cornerRadius(6)
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                
-                Button(action: onRefresh) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 14))
-                        .foregroundColor(.primary)
-                        .frame(width: 32, height: 32)
-                        .background(
-                            Circle()
-                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-            }
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
     }
 }
 
@@ -228,8 +163,16 @@ struct CreateIndexSheet: View {
     @Binding var indexName: String
     @Binding var shards: Int
     @Binding var replicas: Int
-    let onCreate: () -> Void
     @EnvironmentObject var indexVM: IndexViewModel
+    @State private var mode: CreationMode = .visual
+    @State private var definitionJSON = "{\n  \"settings\": {\n    \"number_of_shards\": 1,\n    \"number_of_replicas\": 1\n  },\n  \"mappings\": {\n    \"properties\": {}\n  }\n}"
+
+    private enum CreationMode: String, CaseIterable, Identifiable {
+        case visual = "可视化"
+        case json = "JSON"
+
+        var id: String { rawValue }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -239,35 +182,67 @@ struct CreateIndexSheet: View {
             
             Divider()
             
-            Form {
+            VStack(alignment: .leading, spacing: 12) {
                 TextField("索引名称", text: $indexName)
                     .textFieldStyle(.roundedBorder)
-                
-                Stepper("主分片数: \(shards)", value: $shards, in: 1...10)
-                Stepper("副本数: \(replicas)", value: $replicas, in: 0...5)
+
+                Picker("创建方式", selection: $mode) {
+                    ForEach(CreationMode.allCases) { item in
+                        Text(item.rawValue).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if mode == .visual {
+                    Form {
+                        Stepper("主分片数: \(shards)", value: $shards, in: 1...10)
+                        Stepper("副本数: \(replicas)", value: $replicas, in: 0...5)
+                    }
+                    .formStyle(.grouped)
+                } else {
+                    JSONEditor(text: $definitionJSON)
+                        .frame(minHeight: 260)
+                }
+
+                if let error = indexVM.errorMessage {
+                    Text(error).font(.caption).foregroundColor(.red)
+                }
             }
             .padding()
             
             Divider()
             
             HStack {
-                Button("取消") {
+                Button {
                     isPresented = false
-                }
+                } label: { Label("取消", systemImage: "xmark") }
+                .buttonStyle(.bordered)
+                .help("取消")
                 .keyboardShortcut(.cancelAction)
                 
                 Spacer()
                 
-                Button("创建") {
-                    onCreate()
-                }
+                Button {
+                    Task {
+                        if mode == .visual {
+                            await indexVM.createIndex(name: indexName, numberOfShards: shards, numberOfReplicas: replicas)
+                        } else {
+                            await indexVM.createIndex(name: indexName, definitionJSON: definitionJSON)
+                        }
+                        if indexVM.errorMessage == nil {
+                            indexName = ""
+                            isPresented = false
+                        }
+                    }
+                } label: { Label("创建", systemImage: "checkmark") }
                 .buttonStyle(.borderedProminent)
+                .help("创建")
                 .disabled(indexName.trimmingCharacters(in: .whitespaces).isEmpty)
                 .keyboardShortcut(.defaultAction)
             }
             .padding()
         }
-        .frame(width: 400, height: 250)
+        .frame(width: 600, height: 480)
     }
 }
 
@@ -275,41 +250,9 @@ struct IndexInfoHeaderView: View {
     let index: Index
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 10) {
-                Text(index.name)
-                    .font(.system(size: 20, weight: .semibold))
-                    .lineLimit(1)
-                
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(index.health == .green ? Color.green : (index.health == .yellow ? Color.yellow : Color.red))
-                        .frame(width: 6, height: 6)
-                    Text(index.health.displayText)
-                        .font(.system(size: 13))
-                        .foregroundColor(index.health == .green ? .green : (index.health == .yellow ? .orange : .red))
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill((index.health == .green ? Color.green : (index.health == .yellow ? Color.yellow : Color.red)).opacity(0.1))
-                )
-                
-                Spacer(minLength: 12)
-                
-                Button(action: {
-                    // Add favorite action
-                }) {
-                    Image(systemName: "star")
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-            }
-            
+        VStack(alignment: .leading, spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 32) {
+                HStack(spacing: 24) {
                     InfoItem(label: "文档数", value: "\(index.docsCount.formatted())")
                     InfoItem(label: "存储大小", value: index.storeSize)
                     InfoItem(label: "主分片", value: "\(index.primaryShards)")
@@ -317,16 +260,88 @@ struct IndexInfoHeaderView: View {
                     if let date = index.creationDate {
                         InfoItem(label: "创建时间", value: date.formattedString())
                     }
-                    if let version = index.version {
-                        InfoItem(label: "版本", value: version)
-                    }
+                    IndexHealthBadge(index: index)
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// 告警索引可查看服务端健康详情，正常索引仅展示状态。
+private struct IndexHealthBadge: View {
+    let index: Index
+    @State private var isLoading = false
+    @State private var showDetails = false
+    @State private var details = ""
+
+    private var statusColor: Color {
+        index.health == .green ? .green : (index.health == .yellow ? .orange : .red)
+    }
+
+    var body: some View {
+        Group {
+            if index.health == .green {
+                label
+            } else {
+                Button(action: loadDetails) { label }
+                    .buttonStyle(.plain)
+                    .help("查看健康告警详情")
+            }
+        }
+        .sheet(isPresented: $showDetails) {
+            IndexHealthDetailSheet(indexName: index.name, details: details)
+        }
+    }
+
+    private var label: some View {
+        HStack(spacing: 4) {
+            if isLoading {
+                ProgressView().controlSize(.mini)
+            } else {
+                Circle().fill(statusColor).frame(width: 6, height: 6)
+            }
+            Text(index.health.displayText).font(.system(size: 13)).foregroundColor(statusColor)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(statusColor.opacity(0.1)))
+    }
+
+    private func loadDetails() {
+        Task {
+            isLoading = true
+            do {
+                let data = try await ESAPIClient.shared.getIndexHealthDetails(indexName: index.name)
+                details = String(decoding: data, as: UTF8.self)
+            } catch {
+                details = error.localizedDescription
+            }
+            isLoading = false
+            showDetails = true
+        }
+    }
+}
+
+private struct IndexHealthDetailSheet: View {
+    let indexName: String
+    let details: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(indexName).font(.headline).lineLimit(1)
+                Spacer()
+                Button("关闭") { dismiss() }
+            }
+            .padding(12)
+            Divider()
+            CollapsibleJSONView(jsonText: details)
+        }
+        .frame(width: 720, height: 500)
     }
 }
 
@@ -356,11 +371,11 @@ struct IndexTabBarView: View {
                     indexVM.tabChanged(to: tab)
                 }) {
                     VStack(spacing: 0) {
-                        Text(tab.rawValue)
+                        Text(tab.title)
                             .font(.system(size: 14, weight: indexVM.selectedTab == tab ? .semibold : .regular))
                             .foregroundColor(indexVM.selectedTab == tab ? .blue : .secondary)
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, 7)
                         
                         if indexVM.selectedTab == tab {
                             Rectangle()
@@ -438,7 +453,7 @@ struct IndexStatsView: View {
                         StatsCard(title: "索引操作", value: "\(stats.indexing.indexTotal.formatted())", icon: "square.and.pencil", color: .green)
                         StatsCard(title: "查询次数", value: "\(stats.search.queryTotal.formatted())", icon: "magnifyingglass", color: .purple)
                         StatsCard(title: "存储大小", value: ByteCountFormatter.string(fromByteCount: Int64(stats.store.sizeInBytes), countStyle: .file), icon: "internaldrive", color: .blue)
-                        StatsCard(title: "查询耗时", value: "\(stats.search.queryTimeInMillis)ms", icon: "clock", color: .orange)
+                        StatsCard(title: "查询耗时", value: formattedDuration(stats.search.queryTimeInMillis), icon: "clock", color: .orange)
                     }
                     .padding()
                 } else {
@@ -452,6 +467,11 @@ struct IndexStatsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// 按毫秒或秒展示查询耗时，避免数值与单位粘连。
+    private func formattedDuration(_ milliseconds: Int) -> String {
+        milliseconds < 1_000 ? "\(milliseconds) ms" : String(format: "%.2f s", Double(milliseconds) / 1_000)
     }
 }
 

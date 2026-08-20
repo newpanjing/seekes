@@ -7,41 +7,6 @@ struct ConsoleView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("控制台")
-                        .font(.system(size: 24, weight: .bold))
-                    Text("执行 Elasticsearch 查询")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-                
-                Button(action: {
-                    Task {
-                        await documentVM.executeConsoleQuery()
-                    }
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "play.fill")
-                        Text("执行")
-                    }
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color.green)
-                    .cornerRadius(6)
-                }
-                .buttonStyle(.plain)
-                .disabled(documentVM.consoleIsLoading || !appState.isConnected)
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-            
-            Divider()
-            
             if !appState.isConnected {
                 VStack(spacing: 16) {
                     Image(systemName: "network.slash")
@@ -53,6 +18,20 @@ struct ConsoleView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                HStack {
+                    Spacer()
+                    Button {
+                        Task { await documentVM.executeConsoleQuery() }
+                    } label: {
+                        Label("执行", systemImage: "play.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(documentVM.consoleIsLoading)
+                    .help("执行请求")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                Divider()
                 HSplitView {
                     // Query Editor
                     VStack(spacing: 0) {
@@ -64,11 +43,12 @@ struct ConsoleView: View {
                             Button(action: {
                                 documentVM.consoleText = "GET /_cat/indices?v"
                             }) {
-                                Image(systemName: "trash")
+                                Label("重置", systemImage: "trash")
                                     .foregroundColor(.secondary)
                             }
                             .buttonStyle(.plain)
                             .padding(12)
+                            .help("重置请求")
                         }
                         Divider()
                         

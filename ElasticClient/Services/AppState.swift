@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import SwiftUI
 import AppKit
+import SwiftData
 
 enum AppTheme: String, CaseIterable, Identifiable {
     case system = "系统"
@@ -9,6 +10,14 @@ enum AppTheme: String, CaseIterable, Identifiable {
     case dark = "深色"
     
     var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .system: return "跟随系统"
+        case .light: return "浅色"
+        case .dark: return "深色"
+        }
+    }
     
     var colorScheme: ColorScheme? {
         switch self {
@@ -30,7 +39,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .system: return "跟随系统"
         case .english: return "English"
@@ -59,25 +68,30 @@ class AppState: ObservableObject {
     @Published var theme: AppTheme = .system {
         didSet {
             applyTheme()
-            saveSettings()
+            if !isRestoringPersistentState { saveSettings() }
         }
     }
     @Published var language: AppLanguage = .system {
-        didSet { saveSettings() }
+        didSet {
+            if !isRestoringPersistentState { saveSettings() }
+        }
     }
-    @Published var showAddConnection: Bool = false
-    @Published var showSettings: Bool = false
     
-    private let userDefaults = UserDefaults.standard
-    private let connectionsKey = "elastic_client_connections"
-    private let currentConnectionIdKey = "elastic_client_current_connection"
-    private let themeKey = "elastic_client_theme"
-    private let favoritesKey = "elastic_client_favorites"
-    private let languageKey = "seekes_language"
+    private let modelContext: ModelContext
+    private let legacyUserDefaults = UserDefaults.standard
+    private let legacyConnectionsKey = "elastic_client_connections"
+    private let legacyCurrentConnectionIDKey = "elastic_client_current_connection"
+    private let legacyThemeKey = "elastic_client_theme"
+    private let legacyFavoritesKey = "elastic_client_favorites"
+    private let legacyLanguageKey = "seekes_language"
+    private let settingsIdentifier = "seekes_settings"
+    private var isRestoringPersistentState = false
     
-    init() {
-        loadInitialTheme()
-        loadFromUserDefaults()
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+        isRestoringPersistentState = true
+        loadPersistedState()
+        isRestoringPersistentState = false
     }
     
     // MARK: - Connection Management
@@ -110,16 +124,14 @@ class AppState: ObservableObject {
     
     func deleteConnection(_ connection: Connection) {
         connections.removeAll { $0.id == connection.id }
-        save()
-        
         if currentConnection?.id == connection.id {
             currentConnection = connections.first
             isConnected = false
             if let conn = currentConnection {
                 ESAPIClient.shared.configure(with: conn)
             }
-            saveSettings()
         }
+        save()
     }
     
     func connect(to connection: Connection) async {
@@ -132,7 +144,7 @@ class AppState: ObservableObject {
             let success = try await ESAPIClient.shared.testConnection()
             isConnected = success
             currentConnection = connection
-            selectedSidebarItem = .overview
+            selectedSidebarItem = .indices
             isLoading = false
             
             // Update active status
@@ -166,56 +178,110 @@ class AppState: ObservableObject {
     }
     
     // MARK: - Theme
-    private func loadInitialTheme() {
-        if let themeRaw = userDefaults.string(forKey: themeKey),
-           let savedTheme = AppTheme(rawValue: themeRaw) {
-            theme = savedTheme
-        }
-        if let languageRaw = userDefaults.string(forKey: languageKey),
-           let savedLanguage = AppLanguage(rawValue: languageRaw) {
-            language = savedLanguage
-        }
-        applyTheme()
-    }
-    
     private func applyTheme() {
         NSApp.appearance = theme.colorScheme == .dark ? NSAppearance(named: .darkAqua) : 
                           theme.colorScheme == .light ? NSAppearance(named: .aqua) : nil
     }
     
-    // MARK: - UserDefaults Persistence
-    private func loadFromUserDefaults() {
-        // Load connections
-        if let data = userDefaults.data(forKey: connectionsKey),
-           let decoded = try? JSONDecoder().decode([Connection].self, from: data) {
-            connections = decoded
+    // MARK: - SwiftData Persistence
+    /// 从 SwiftData 恢复状态；首次升级时仅迁移一次旧版 UserDefaults 数据。
+    private func loadPersistedState() {
+        let storedConnections = (try? modelContext.fetch(FetchDescriptor<StoredConnection>(sortBy: [SortDescriptor(\.sortOrder)]))) ?? []
+        if storedConnections.isEmpty {
+            connections = legacyConnections()
+            persistConnections()
+        } else {
+            connections = storedConnections.map(\.connection)
         }
-        
-        // Load favorites
-        if let savedFavorites = userDefaults.stringArray(forKey: favoritesKey) {
-            favorites = savedFavorites
+
+        let settings = settingsRecord()
+        if !settings.hasMigratedLegacyData {
+            migrateLegacySettings(into: settings)
         }
-        
-        // Restore current connection
-        if let currentIdString = userDefaults.string(forKey: currentConnectionIdKey),
-           let currentId = UUID(uuidString: currentIdString),
-           let conn = connections.first(where: { $0.id == currentId }) {
-            currentConnection = conn
-            ESAPIClient.shared.configure(with: conn)
+        theme = AppTheme(rawValue: settings.themeRawValue) ?? .system
+        language = AppLanguage(rawValue: settings.languageRawValue) ?? .system
+        favorites = (try? JSONDecoder().decode([String].self, from: settings.favoriteIndexData)) ?? []
+        currentConnection = connections.first(where: { $0.id == settings.currentConnectionID })
+        if let currentConnection {
+            ESAPIClient.shared.configure(with: currentConnection)
         }
+        applyTheme()
     }
-    
-    private func save() {
-        if let encoded = try? JSONEncoder().encode(connections) {
-            userDefaults.set(encoded, forKey: connectionsKey)
+
+    /// 读取旧版连接数据，仅用于没有 SwiftData 记录时的首次迁移。
+    private func legacyConnections() -> [Connection] {
+        guard let data = legacyUserDefaults.data(forKey: legacyConnectionsKey),
+              let decoded = try? JSONDecoder().decode([Connection].self, from: data) else {
+            return []
         }
+        return decoded
+    }
+
+    /// 将旧版偏好迁移到同一份 SwiftData 设置记录，保留旧数据以便版本回退。
+    private func migrateLegacySettings(into settings: StoredAppSettings) {
+        settings.themeRawValue = legacyUserDefaults.string(forKey: legacyThemeKey) ?? AppTheme.system.rawValue
+        settings.languageRawValue = legacyUserDefaults.string(forKey: legacyLanguageKey) ?? AppLanguage.system.rawValue
+        settings.currentConnectionID = legacyUserDefaults.string(forKey: legacyCurrentConnectionIDKey).flatMap(UUID.init(uuidString:))
+        let favorites = legacyUserDefaults.stringArray(forKey: legacyFavoritesKey) ?? []
+        settings.favoriteIndexData = (try? JSONEncoder().encode(favorites)) ?? Data()
+        settings.hasMigratedLegacyData = true
+        saveModelContext()
+    }
+
+    /// 获取唯一的应用设置记录，不存在时创建默认记录。
+    private func settingsRecord() -> StoredAppSettings {
+        if let settings = try? modelContext.fetch(FetchDescriptor<StoredAppSettings>()).first(where: { $0.identifier == settingsIdentifier }) {
+            return settings
+        }
+        let settings = StoredAppSettings(
+            identifier: settingsIdentifier,
+            themeRawValue: AppTheme.system.rawValue,
+            languageRawValue: AppLanguage.system.rawValue,
+            currentConnectionID: nil,
+            favoriteIndexData: Data(),
+            hasMigratedLegacyData: false
+        )
+        modelContext.insert(settings)
+        return settings
+    }
+
+    /// 将内存中的连接列表同步到 SwiftData，移除已删除的记录。
+    private func persistConnections() {
+        let stored = (try? modelContext.fetch(FetchDescriptor<StoredConnection>())) ?? []
+        var records = Dictionary(uniqueKeysWithValues: stored.map { ($0.id, $0) })
+        for (offset, connection) in connections.enumerated() {
+            if let record = records.removeValue(forKey: connection.id) {
+                record.update(from: connection, sortOrder: offset)
+            } else {
+                modelContext.insert(StoredConnection(connection: connection, sortOrder: offset))
+            }
+        }
+        records.values.forEach(modelContext.delete)
+        saveModelContext()
+    }
+
+    private func save() {
+        persistConnections()
         saveSettings()
     }
     
     private func saveSettings() {
-        userDefaults.set(theme.rawValue, forKey: themeKey)
-        userDefaults.set(favorites, forKey: favoritesKey)
-        userDefaults.set(language.rawValue, forKey: languageKey)
-        userDefaults.set(currentConnection?.id.uuidString, forKey: currentConnectionIdKey)
+        let settings = settingsRecord()
+        settings.themeRawValue = theme.rawValue
+        settings.languageRawValue = language.rawValue
+        settings.currentConnectionID = currentConnection?.id
+        settings.favoriteIndexData = (try? JSONEncoder().encode(favorites)) ?? Data()
+        saveModelContext()
+    }
+
+    /// 提交 SwiftData 变更；保存失败时保留错误，避免连接数据静默丢失。
+    private func saveModelContext() {
+        modelContext.processPendingChanges()
+        do {
+            try modelContext.save()
+        } catch {
+            errorMessage = "本地数据保存失败：\(error.localizedDescription)"
+            print("SeekES SwiftData save failed: \(error)")
+        }
     }
 }

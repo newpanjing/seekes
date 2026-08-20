@@ -21,7 +21,7 @@ class DocumentViewModel: ObservableObject {
     @Published var documentOperation: DocumentOperation = .view
     @Published var isEditing: Bool = false
     @Published var showOperationPanel: Bool = true
-    @Published var sortField: String = "_id"
+    @Published var sortField: String = ""
     @Published var sortOrder: String = "asc"
     @Published var editJsonText: String = ""
     @Published var showImportSheet: Bool = false
@@ -29,6 +29,9 @@ class DocumentViewModel: ObservableObject {
     @Published var consoleResult: NSAttributedString?
     @Published var consoleIsLoading: Bool = false
     @Published var isConnected: Bool = false
+    @Published var lastQueryJSON: String = ""
+    @Published var lastResponseJSON: String = ""
+    @Published var lastQueryDuration: TimeInterval?
     
     private var currentIndex: String?
     private var cancellables = Set<AnyCancellable>()
@@ -108,9 +111,10 @@ class DocumentViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
+        let startedAt = Date()
         do {
             let from = (currentPage - 1) * pageSize
-            let sort: [[String: Any]] = [[sortField: ["order": sortOrder]]]
+            let sort = sortField.isEmpty ? nil : [[sortField: ["order": sortOrder]]]
             
             let query: [String: Any]?
             if queryMode == .builder {
@@ -138,6 +142,7 @@ class DocumentViewModel: ObservableObject {
                 size: pageSize,
                 sort: sort
             )
+            lastQueryDuration = Date().timeIntervalSince(startedAt)
             
             documents = response.hits.hits
             totalResults = response.hits.total.value
@@ -152,10 +157,86 @@ class DocumentViewModel: ObservableObject {
                 }
             }
         } catch {
+            lastQueryDuration = Date().timeIntervalSince(startedAt)
             errorMessage = error.localizedDescription
         }
         
         isLoading = false
+    }
+
+    /// 导出当前查询命中的全部文档，按批次读取以避免只导出当前页。
+    @MainActor
+    func exportAllDocuments() async {
+        guard let indexName = currentIndex, isConnected else { return }
+        guard let query = queryForCurrentInput() else { return }
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(indexName)-results.json"
+        panel.allowedFileTypes = ["json"]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            var exported: [[String: Any]] = []
+            let batchSize = 1_000
+            var from = 0
+            while true {
+                let response = try await ESAPIClient.shared.searchDocuments(
+                    index: indexName,
+                    query: query,
+                    from: from,
+                    size: batchSize,
+                    sort: sortField.isEmpty ? nil : [[sortField: ["order": sortOrder]]]
+                )
+                exported.append(contentsOf: response.hits.hits.map(exportObject))
+                if response.hits.hits.count < batchSize { break }
+                from += batchSize
+            }
+            try writeExport(exported, to: url)
+        } catch {
+            errorMessage = "导出失败：\(error.localizedDescription)"
+        }
+    }
+
+    /// 导出当前选中的单个文档。
+    @MainActor
+    func exportSelectedDocument() {
+        guard let document = selectedDocument else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(document.id).json"
+        panel.allowedFileTypes = ["json"]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try writeExport(exportObject(document), to: url)
+        } catch {
+            errorMessage = "导出失败：\(error.localizedDescription)"
+        }
+    }
+
+    /// 复用当前查询输入，确保导出范围与结果列表一致。
+    private func queryForCurrentInput() -> [String: Any]? {
+        if queryMode == .builder { return makeBuilderQuery() }
+        let text = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        guard let data = text.data(using: .utf8),
+              let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            errorMessage = "JSON 格式错误"
+            return nil
+        }
+        return parsed["query"] as? [String: Any] ?? parsed
+    }
+
+    /// 将搜索命中转换为可直接保存的 JSON 对象。
+    private func exportObject(_ hit: DocumentHit) -> [String: Any] {
+        var result: [String: Any] = ["_index": hit.index, "_id": hit.id]
+        if let score = hit.score { result["_score"] = score }
+        result["_source"] = sourceDictionary(from: hit.source ?? [:])
+        return result
+    }
+
+    /// 格式化并写入导出文件。
+    private func writeExport(_ value: Any, to url: URL) throws {
+        let data = try JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: url, options: .atomic)
     }
 
     /// 根据 UI 中选择的字段、操作符和值构建 Elasticsearch Query DSL。
@@ -224,6 +305,38 @@ class DocumentViewModel: ObservableObject {
         }
         isLoading = false
     }
+
+    /// 在当前索引创建单个文档；空 ID 由 Elasticsearch 自动生成。
+    @MainActor
+    func createDocument(id: String, jsonText: String) async -> Bool {
+        guard let indexName = currentIndex else {
+            errorMessage = "请先选择索引"
+            return false
+        }
+        guard let data = jsonText.data(using: .utf8),
+              let document = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            errorMessage = "JSON 格式错误"
+            return false
+        }
+
+        isLoading = true
+        errorMessage = nil
+        do {
+            let documentID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+            _ = try await ESAPIClient.shared.indexDocument(
+                index: indexName,
+                id: documentID.isEmpty ? nil : documentID,
+                document: document
+            )
+            await searchDocuments()
+            isLoading = false
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            isLoading = false
+            return false
+        }
+    }
     
     func getDocumentJSON() -> NSAttributedString {
         guard let doc = selectedDocumentDetail,
@@ -233,6 +346,16 @@ class DocumentViewModel: ObservableObject {
         
         let sourceDict = sourceDictionary(from: source)
         return JSONFormatter.format(sourceDict)
+    }
+
+    /// 返回文档源数据的格式化 JSON，供可折叠 JSON 视图展示。
+    func documentJSONString() -> String {
+        guard let doc = selectedDocumentDetail,
+              let source = doc.source,
+              let data = try? JSONSerialization.data(withJSONObject: sourceDictionary(from: source), options: [.prettyPrinted]) else {
+            return "选择一个文档查看详情"
+        }
+        return String(decoding: data, as: UTF8.self)
     }
     
     func startEditing() {

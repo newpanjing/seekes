@@ -3,61 +3,89 @@ import SwiftUI
 /// 连接导航侧栏；功能导航统一位于内容区顶部。
 struct SidebarView: View {
     @EnvironmentObject var appState: AppState
-    @Binding var showConnectionManager: Bool
+    @Binding var showConnectionEditor: Bool
+    @Binding var editingConnection: Connection?
     @Binding var showSettings: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                ESLogoView().frame(width: 30, height: 30)
-                Text("SeekES").font(.system(size: 18, weight: .semibold))
+                AppLogoView().frame(width: 30, height: 30)
+                Text("SeekES").font(.system(size: 16, weight: .semibold))
                 Spacer()
-                Button { showConnectionManager = true } label: {
+                Button {
+                    editingConnection = nil
+                    showConnectionEditor = true
+                } label: {
                     Image(systemName: "plus")
                 }
                 .buttonStyle(.plain)
                 .help("添加连接")
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
 
             Divider()
 
             ScrollView {
-                LazyVStack(spacing: 4) {
-                    ForEach(appState.connections) { connection in
-                        Button {
-                            Task { await appState.connect(to: connection) }
-                        } label: {
-                            ConnectionCard(
-                                connection: connection,
-                                isConnected: appState.isConnected && appState.currentConnection?.id == connection.id,
-                                isSelected: appState.currentConnection?.id == connection.id
-                            )
-                        }
-                        .buttonStyle(.plain)
+                if appState.connections.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "network.slash")
+                            .font(.system(size: 22))
+                            .foregroundColor(.secondary)
+                        Text("暂无连接")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 32)
+                } else {
+                    LazyVStack(spacing: 4) {
+                        ForEach(appState.connections) { connection in
+                            Button {
+                                Task { await appState.connect(to: connection) }
+                            } label: {
+                                ConnectionCard(
+                                    connection: connection,
+                                    isConnected: appState.isConnected && appState.currentConnection?.id == connection.id,
+                                    isSelected: appState.currentConnection?.id == connection.id
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button("连接") {
+                                    Task { await appState.connect(to: connection) }
+                                }
+                                Button("编辑") {
+                                    editingConnection = connection
+                                    showConnectionEditor = true
+                                }
+                                Divider()
+                                Button("删除", role: .destructive) {
+                                    NSAlert.showConfirmation(
+                                        title: "删除连接",
+                                        message: "确定要删除连接 \(connection.name) 吗？此操作不可撤销。"
+                                    ) { confirmed in
+                                        if confirmed { appState.deleteConnection(connection) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(8)
                 }
-                .padding(8)
-            }
-
-            if appState.connections.isEmpty {
-                ContentUnavailableView("暂无连接", systemImage: "network.slash")
-                    .padding()
             }
 
             Spacer(minLength: 0)
             Divider()
             HStack {
-                Button { showConnectionManager = true } label: {
-                    Label("管理连接", systemImage: "network")
-                }
-                .buttonStyle(.plain)
-                Spacer()
                 Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
+                    Label("设置", systemImage: "gearshape")
+                        .font(.system(size: 13, weight: .medium))
                 }
                 .buttonStyle(.plain)
                 .help("设置")
+                Spacer()
             }
             .padding(12)
         }

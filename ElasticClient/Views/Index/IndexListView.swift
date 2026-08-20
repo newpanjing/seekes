@@ -2,11 +2,13 @@ import SwiftUI
 
 struct IndexListView: View {
     @EnvironmentObject var indexVM: IndexViewModel
+    let onCreate: () -> Void
+    let onRefresh: () -> Void
     
     var body: some View {
         VStack(spacing: 0) {
             // Search Bar
-            VStack(spacing: 0) {
+            HStack(spacing: 6) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 13))
@@ -15,9 +17,12 @@ struct IndexListView: View {
                     TextField("搜索索引名称", text: $indexVM.searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
+                        .layoutPriority(1)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.leading, 12)
+                .padding(.trailing, 10)
+                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
                         .fill(Color(NSColor.controlBackgroundColor))
@@ -26,10 +31,12 @@ struct IndexListView: View {
                                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                         )
                 )
+                indexActionButton(systemImage: "plus", help: "新建索引", action: onCreate)
+                indexActionButton(systemImage: "arrow.clockwise", help: "刷新索引", action: onRefresh)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
             
             // Index List
             ScrollView {
@@ -46,6 +53,25 @@ struct IndexListView: View {
                         .onTapGesture {
                             indexVM.selectIndex(index)
                         }
+                        .contextMenu {
+                            Button("查看数据") { indexVM.selectIndex(index) }
+                            Button("查看映射") {
+                                indexVM.selectIndex(index)
+                                indexVM.tabChanged(to: .mapping)
+                            }
+                            Button("刷新字段") { Task { await indexVM.loadFieldsForIndex(index.name) } }
+                            Divider()
+                            Button("删除索引", role: .destructive) {
+                                NSAlert.showConfirmation(
+                                    title: "删除索引",
+                                    message: "确定要删除索引 \(index.name) 吗？索引中的所有文档都会被删除。"
+                                ) { confirmed in
+                                    if confirmed {
+                                        Task { await indexVM.deleteIndex(index) }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 8)
@@ -60,10 +86,23 @@ struct IndexListView: View {
                     .foregroundColor(.secondary)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
         .background(Color(NSColor.textBackgroundColor))
+    }
+
+    /// 索引列表顶部使用统一尺寸的图标操作按钮。
+    private func indexActionButton(systemImage: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .medium))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.mini)
+        .help(help)
     }
 }
 
@@ -87,7 +126,7 @@ struct IndexListRow: View {
                 }) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                        .foregroundColor(.secondary)
                         .frame(width: 16, height: 20)
                         .contentShape(Rectangle())
                 }
@@ -97,7 +136,7 @@ struct IndexListRow: View {
                     HStack(spacing: 6) {
                         Text(index.name)
                             .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                            .foregroundColor(isSelected ? .white : .primary)
+                            .foregroundColor(.primary)
                             .lineLimit(1)
                         
                         Circle()
@@ -110,11 +149,11 @@ struct IndexListRow: View {
                     HStack(spacing: 8) {
                         Text("\(index.docsCount.formatted()) 文档")
                             .font(.system(size: 11))
-                            .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+                            .foregroundColor(.secondary)
                         
                         Text("\(fields.count) 字段")
                             .font(.system(size: 11))
-                            .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+                            .foregroundColor(.secondary)
                     }
                 }
             }
@@ -122,7 +161,7 @@ struct IndexListRow: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.blue : Color.clear)
+                    .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
             )
             
             // Fields list (when expanded)
@@ -145,15 +184,8 @@ struct IndexListRow: View {
                             .padding(.leading, 32)
                             .padding(.vertical, 6)
                     } else {
-                        ForEach(fields.prefix(20)) { field in
+                        ForEach(fields) { field in
                             FieldRowView(field: field, isSelected: isSelected)
-                        }
-                        if fields.count > 20 {
-                            Text("... 还有 \(fields.count - 20) 个字段")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                                .padding(.leading, 32)
-                                .padding(.vertical, 4)
                         }
                     }
                 }
@@ -167,29 +199,38 @@ struct IndexListRow: View {
 struct FieldRowView: View {
     let field: IndexField
     let isSelected: Bool
+
+    private var iconName: String {
+        if field.name == "_id" { return "key" }
+        return field.isSearchable ? "magnifyingglass" : "tag"
+    }
+
+    private var iconColor: Color {
+        if field.name == "_id" { return .orange }
+        return field.isSearchable ? .blue : .secondary
+    }
     
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 8))
-                .foregroundColor(isSelected ? .white.opacity(0.5) : .secondary.opacity(0.5))
+            Image(systemName: iconName)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(iconColor)
                 .frame(width: 16)
             
             Text(field.name)
                 .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(isSelected ? .white.opacity(0.9) : .primary)
-                .lineLimit(1)
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
             
             Spacer(minLength: 4)
             
             Text(field.type)
                 .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(isSelected ? .white.opacity(0.7) : .blue)
+                .foregroundColor(.blue)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1)
                 .background(
-                    Capsule()
-                        .fill(isSelected ? Color.white.opacity(0.2) : Color.blue.opacity(0.1))
+                    Capsule().fill(Color.blue.opacity(0.1))
                 )
         }
         .padding(.leading, 8)

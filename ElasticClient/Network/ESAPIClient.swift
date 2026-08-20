@@ -252,13 +252,15 @@ class ESAPIClient {
             method: "GET",
             queryItems: [
                 URLQueryItem(name: "format", value: "json"),
-                URLQueryItem(name: "h", value: "health,status,index,docsCount,docsDeleted,storeSize,pri,rep,creationDate,version")
+                URLQueryItem(name: "h", value: "health,status,index,docs.count,docs.deleted,store.size,pri,rep,creation.date,version")
             ]
         )
         
         return catIndices.compactMap { catIndex in
-            guard let health = Index.IndexHealth(rawValue: catIndex.health),
-                  let status = Index.IndexStatus(rawValue: catIndex.status),
+            guard let healthValue = catIndex.health,
+                  let statusValue = catIndex.status,
+                  let health = Index.IndexHealth(rawValue: healthValue),
+                  let status = Index.IndexStatus(rawValue: statusValue),
                   let docsCount = Int(catIndex.docsCount),
                   let primaryShards = Int(catIndex.pri),
                   let replicaShards = Int(catIndex.rep) else {
@@ -286,14 +288,43 @@ class ESAPIClient {
     }
     
     func getIndexStats(indexName: String) async throws -> IndexStats {
-        let response: [String: IndexStatsWrapper] = try await request(
-            path: "/\(indexName)/_stats",
-            method: "GET"
-        )
-        guard let wrapper = response[indexName] else {
+        let data = try await rawRequest(path: "/\(indexName)/_stats", method: "GET")
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let indices = root[IndexStatsJSONKey.indices] as? [String: Any],
+              let index = indices[indexName] as? [String: Any],
+              let total = index[IndexStatsJSONKey.total] as? [String: Any] else {
             throw ESError.invalidResponse
         }
-        return wrapper.stats
+
+        let docs = total[IndexStatsJSONKey.docs] as? [String: Any] ?? [:]
+        let store = total[IndexStatsJSONKey.store] as? [String: Any] ?? [:]
+        let indexing = total[IndexStatsJSONKey.indexing] as? [String: Any] ?? [:]
+        let search = total[IndexStatsJSONKey.search] as? [String: Any] ?? [:]
+        return IndexStats(
+            docs: IndexDocsStats(
+                count: statsInteger(docs[IndexStatsJSONKey.count]),
+                deleted: statsInteger(docs[IndexStatsJSONKey.deleted])
+            ),
+            store: IndexStoreStats(sizeInBytes: statsInteger(store[IndexStatsJSONKey.sizeInBytes])),
+            indexing: IndexIndexingStats(
+                indexTotal: statsInteger(indexing[IndexStatsJSONKey.indexTotal]),
+                indexTimeInMillis: statsInteger(indexing[IndexStatsJSONKey.indexTimeInMillis]),
+                deleteTotal: statsInteger(indexing[IndexStatsJSONKey.deleteTotal])
+            ),
+            search: IndexSearchStats(
+                queryTotal: statsInteger(search[IndexStatsJSONKey.queryTotal]),
+                queryTimeInMillis: statsInteger(search[IndexStatsJSONKey.queryTimeInMillis]),
+                fetchTotal: statsInteger(search[IndexStatsJSONKey.fetchTotal])
+            )
+        )
+    }
+
+    /// Elasticsearch 数值字段可能为 JSON 数值或字符串，统一转换为统计模型使用的整数。
+    private func statsInteger(_ value: Any?) -> Int {
+        if let value = value as? Int { return value }
+        if let value = value as? NSNumber { return value.intValue }
+        if let value = value as? String { return Int(value) ?? 0 }
+        return 0
     }
     
     func createIndex(name: String, mappings: [String: Any]? = nil, settings: [String: Any]? = nil) async throws -> Bool {
@@ -325,6 +356,15 @@ class ESAPIClient {
     func getIndexSettings(indexName: String) async throws -> Data {
         return try await rawRequest(path: "/\(indexName)/_settings", method: "GET")
     }
+
+    /// 获取索引级健康详情，用于展示 Elasticsearch 返回的真实告警原因。
+    func getIndexHealthDetails(indexName: String) async throws -> Data {
+        return try await rawRequest(
+            path: "/_cluster/health/\(indexName)",
+            method: "GET",
+            queryItems: [URLQueryItem(name: "level", value: "shards")]
+        )
+    }
     
     // MARK: - Document APIs
     func searchDocuments(index: String, query: [String: Any]? = nil, from: Int = 0, size: Int = 10, sort: [[String: Any]]? = nil) async throws -> SearchResponse {
@@ -349,8 +389,15 @@ class ESAPIClient {
     }
     
     func indexDocument(index: String, id: String? = nil, document: [String: Any]) async throws -> Document {
-        let path = id != nil ? "/\(index)/_doc/\(id!)" : "/\(index)/_doc"
-        let method: String = id != nil ? "PUT" : "POST"
+        let path: String
+        let method: String
+        if let id {
+            path = "/\(index)/_doc/\(id)"
+            method = "PUT"
+        } else {
+            path = "/\(index)/_doc"
+            method = "POST"
+        }
         return try await request(path: path, method: method, body: document)
     }
     
@@ -436,6 +483,19 @@ class ESAPIClient {
         let (_, data2) = try validateResponse(data: data, response: response)
         return try decoder.decode(SearchResponse.self, from: data2)
     }
+
+    /// 执行原始 Query DSL，并保留服务端原始 JSON 结果供界面高亮展示。
+    func executeRawQuery(index: String, dsl: String) async throws -> Data {
+        guard let bodyData = dsl.data(using: .utf8),
+              (try? JSONSerialization.jsonObject(with: bodyData)) != nil else {
+            throw ESError.invalidBody
+        }
+        var request = try buildRequest(path: "/\(index)/_search", method: "POST")
+        request.httpBody = bodyData
+        let (data, response) = try await session.data(for: request)
+        let (_, responseData) = try validateResponse(data: data, response: response)
+        return responseData
+    }
     
     func executeConsoleQuery(_ dsl: String) async throws -> Data {
         // Parse the DSL to handle multi-line console queries
@@ -491,7 +551,36 @@ class ESAPIClient {
             path = "/_analyze"
         }
         
-        return try await request(path: path, method: "POST", body: body)
+        let requestData = try JSONSerialization.data(withJSONObject: body, options: [])
+        let requestBody = String(decoding: requestData, as: UTF8.self)
+        let data = try await rawRequest(path: path, method: "POST", bodyString: requestBody)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ESError.invalidResponse
+        }
+
+        // Analyze 插件可能省略 offset/type/position，按可选字段读取，避免一条坏 token 使整页失败。
+        let tokenValues = json["tokens"] as? [[String: Any]] ?? []
+        let tokens = tokenValues.enumerated().compactMap { offset, value -> AnalyzeToken? in
+            guard let token = value["token"] as? String else { return nil }
+            let start = integerValue(value["start_offset"]) ?? 0
+            let end = integerValue(value["end_offset"]) ?? start
+            let position = integerValue(value["position"]) ?? offset
+            return AnalyzeToken(
+                token: token,
+                startOffset: start,
+                endOffset: end,
+                type: value["type"] as? String ?? "unknown",
+                position: position
+            )
+        }
+        return AnalyzeResponse(tokens: tokens)
+    }
+
+    private func integerValue(_ value: Any?) -> Int? {
+        if let value = value as? Int { return value }
+        if let value = value as? NSNumber { return value.intValue }
+        if let value = value as? String { return Int(value) }
+        return nil
     }
     
     // MARK: - Helper Methods
@@ -634,8 +723,8 @@ class ESAPIClient {
 
 // Helper structs for decoding
 private struct CatIndexResponse: Codable {
-    let health: String
-    let status: String
+    let health: String?
+    let status: String?
     let index: String
     let docsCount: String
     let docsDeleted: String
@@ -644,12 +733,45 @@ private struct CatIndexResponse: Codable {
     let rep: String
     let creationDate: String?
     let version: String?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        health = try container.decodeIfPresent(String.self, forKey: .health)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        index = try container.decodeIfPresent(String.self, forKey: .index) ?? ""
+        docsCount = try container.decodeIfPresent(String.self, forKey: .docsCount) ?? "0"
+        docsDeleted = try container.decodeIfPresent(String.self, forKey: .docsDeleted) ?? "0"
+        storeSize = try container.decodeIfPresent(String.self, forKey: .storeSize)
+        pri = try container.decodeIfPresent(String.self, forKey: .pri) ?? "0"
+        rep = try container.decodeIfPresent(String.self, forKey: .rep) ?? "0"
+        creationDate = try container.decodeIfPresent(String.self, forKey: .creationDate)
+        version = try container.decodeIfPresent(String.self, forKey: .version)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case health, status, index, pri, rep, version
+        case docsCount = "docs.count"
+        case docsDeleted = "docs.deleted"
+        case storeSize = "store.size"
+        case creationDate = "creation.date"
+    }
 }
 
-private struct IndexStatsWrapper: Codable {
-    let stats: IndexStats
-    
-    enum CodingKeys: String, CodingKey {
-        case stats = "total"
-    }
+/// Elasticsearch 索引统计响应中的固定字段名。
+private enum IndexStatsJSONKey {
+    static let indices = "indices"
+    static let total = "total"
+    static let docs = "docs"
+    static let store = "store"
+    static let indexing = "indexing"
+    static let search = "search"
+    static let count = "count"
+    static let deleted = "deleted"
+    static let sizeInBytes = "size_in_bytes"
+    static let indexTotal = "index_total"
+    static let indexTimeInMillis = "index_time_in_millis"
+    static let deleteTotal = "delete_total"
+    static let queryTotal = "query_total"
+    static let queryTimeInMillis = "query_time_in_millis"
+    static let fetchTotal = "fetch_total"
 }

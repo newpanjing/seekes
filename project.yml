@@ -26,13 +26,18 @@ targets:
           - Info-Static.plist
           - "**/*.lproj"
           - Assets.xcassets
-    resources:
       - path: ElasticClient/Assets.xcassets
+        buildPhase: resources
       - path: ElasticClient/en.lproj
+        buildPhase: resources
       - path: ElasticClient/zh-Hans.lproj
+        buildPhase: resources
       - path: ElasticClient/ja.lproj
+        buildPhase: resources
       - path: ElasticClient/ko.lproj
+        buildPhase: resources
       - path: ElasticClient/ru.lproj
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: ElasticClient/Info-Static.plist

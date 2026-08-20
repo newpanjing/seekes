@@ -21,6 +21,7 @@ struct ConnectionManagementView: View {
                     Label("添加连接", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
+                .help("添加连接")
             }
             .padding()
             
@@ -66,7 +67,12 @@ struct ConnectionManagementView: View {
                                 showAddSheet = true
                             },
                             onDelete: {
-                                appState.deleteConnection(connection)
+                                NSAlert.showConfirmation(
+                                    title: "删除连接",
+                                    message: "确定要删除连接 \(connection.name) 吗？此操作不可撤销。"
+                                ) { confirmed in
+                                    if confirmed { appState.deleteConnection(connection) }
+                                }
                             }
                         )
                     }
@@ -95,9 +101,11 @@ struct ConnectionManagementView: View {
             // Footer
             HStack {
                 Spacer()
-                Button("关闭") {
+                Button {
                     dismiss()
-                }
+                } label: { Label("关闭", systemImage: "xmark") }
+                .buttonStyle(.bordered)
+                .help("关闭")
                 .keyboardShortcut(.cancelAction)
             }
             .padding()
@@ -120,7 +128,7 @@ struct ConnectionRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            ESLogoView()
+            AppLogoView()
                 .frame(width: 40, height: 40)
             
             VStack(alignment: .leading, spacing: 4) {
@@ -167,27 +175,31 @@ struct ConnectionRowView: View {
             HStack(spacing: 8) {
                 Button(action: onConnect) {
                     if isLoading {
-                        ProgressView()
-                            .controlSize(.small)
+                        HStack(spacing: 4) {
+                            ProgressView().controlSize(.small)
+                            Text("连接中")
+                        }
                     } else {
-                        Label(isConnected ? "重新连接" : "连接", systemImage: isConnected ? "arrow.clockwise" : "link")
-                            .font(.callout)
+                        Label(isConnected ? "重连" : "连接", systemImage: isConnected ? "arrow.clockwise" : "link")
                     }
                 }
                 .buttonStyle(.bordered)
                 .disabled(isLoading)
+                .help(isConnected ? "重新连接" : "连接")
                 
                 Button(action: onEdit) {
-                    Image(systemName: "pencil")
+                    Label("编辑", systemImage: "pencil")
                 }
                 .buttonStyle(.bordered)
                 .disabled(isLoading)
+                .help("编辑连接")
                 
                 Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash")
+                    Label("删除", systemImage: "trash")
                 }
                 .buttonStyle(.bordered)
                 .disabled(isLoading)
+                .help("删除连接")
             }
         }
         .padding(16)
@@ -199,6 +211,12 @@ struct ConnectionRowView: View {
                         .stroke(isActive ? Color.blue.opacity(0.5) : Color.gray.opacity(0.2), lineWidth: isActive ? 2 : 1)
                 )
         )
+        .contextMenu {
+            Button(isConnected ? "重新连接" : "连接", action: onConnect)
+            Button("编辑", action: onEdit)
+            Divider()
+            Button("删除", role: .destructive, action: onDelete)
+        }
     }
 }
 
@@ -285,10 +303,12 @@ struct ConnectionEditView: View {
             Divider()
             
             HStack {
-                Button("测试连接") {
+                Button {
                     testConnection()
-                }
+                } label: { Label("测试", systemImage: "bolt.horizontal") }
+                .buttonStyle(.bordered)
                 .disabled(isTesting)
+                .help("测试连接")
 
                 if isTesting {
                     ProgressView().controlSize(.small)
@@ -302,15 +322,18 @@ struct ConnectionEditView: View {
                 
                 Spacer()
                 
-                Button("取消") {
+                Button {
                     dismiss()
-                }
+                } label: { Label("取消", systemImage: "xmark") }
+                .buttonStyle(.bordered)
+                .help("取消")
                 .keyboardShortcut(.cancelAction)
                 
-                Button(isEditing ? "保存" : "添加") {
+                Button {
                     saveConnection()
-                }
+                } label: { Label(isEditing ? "保存" : "添加连接", systemImage: "checkmark") }
                 .buttonStyle(.borderedProminent)
+                .help(isEditing ? "保存" : "添加连接")
                 .keyboardShortcut(.defaultAction)
                 .disabled(name.isEmpty || host.isEmpty || port.isEmpty || isTesting)
             }
@@ -324,7 +347,7 @@ struct ConnectionEditView: View {
                 port = "\(conn.port)"
                 username = conn.username ?? ""
                 password = conn.password ?? ""
-                useAuth = conn.username != nil && !conn.username!.isEmpty
+                useAuth = !(conn.username?.isEmpty ?? true)
             }
         }
     }

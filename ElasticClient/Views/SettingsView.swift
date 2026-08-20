@@ -3,27 +3,23 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
-    @State private var showConnectionManagement = false
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Text("设置")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.headline)
                 Spacer()
-                Button(action: { dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
-                        .font(.title2)
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
                 }
                 .buttonStyle(.plain)
+                .help("关闭")
             }
-            .padding()
-            
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
             Divider()
-            
+
             ScrollView {
                 VStack(spacing: 24) {
                     // Appearance Section
@@ -46,51 +42,6 @@ struct SettingsView: View {
                             }
                             .labelsHidden()
                             .frame(width: 150)
-                        }
-                    }
-                    
-                    // Connections Section
-                    SettingsSection(title: "连接", icon: "network") {
-                        SettingsItem(icon: "list.bullet", title: "管理连接", iconColor: .purple) {
-                            Button(action: {
-                                showConnectionManagement = true
-                            }) {
-                                HStack(spacing: 6) {
-                                    Text("\(appState.connections.count) 个连接")
-                                        .foregroundColor(.secondary)
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        
-                        if let currentConn = appState.currentConnection {
-                            SettingsItem(icon: appState.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill", 
-                                       title: "当前连接", 
-                                       iconColor: appState.isConnected ? .green : .red) {
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text(currentConn.name)
-                                        .foregroundColor(.primary)
-                                    Text(currentConn.baseURL)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        } else {
-                            SettingsItem(icon: "exclamationmark.triangle.fill", title: "当前连接", iconColor: .orange) {
-                                Text("未连接")
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    
-                    // General Section
-                    SettingsSection(title: "通用", icon: "gearshape.fill") {
-                        SettingsItem(icon: "star.fill", title: "收藏的索引", iconColor: .yellow) {
-                            Text("\(appState.favorites.count) 个")
-                                .foregroundColor(.secondary)
                         }
                     }
                     
@@ -117,9 +68,6 @@ struct SettingsView: View {
         }
         .frame(width: 600, height: 550)
         .background(Color(NSColor.windowBackgroundColor))
-        .sheet(isPresented: $showConnectionManagement) {
-            ConnectionManagementView()
-        }
     }
 }
 
@@ -199,7 +147,7 @@ struct ThemeButton: View {
             VStack(spacing: 6) {
                 Image(systemName: iconName)
                     .font(.system(size: 18))
-                Text(theme.rawValue)
+                Text(theme.title)
                     .font(.system(size: 12))
             }
             .frame(width: 70, height: 60)

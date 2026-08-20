@@ -44,6 +44,13 @@ struct SearchResponse: Codable {
         case timedOut = "timed_out"
         case hits
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        took = try container.decodeIfPresent(Int.self, forKey: .took) ?? 0
+        timedOut = try container.decodeIfPresent(Bool.self, forKey: .timedOut) ?? false
+        hits = try container.decodeIfPresent(SearchHits.self, forKey: .hits) ?? SearchHits(total: SearchTotal(value: 0, relation: "eq"), maxScore: nil, hits: [])
+    }
 }
 
 struct SearchHits: Codable {
@@ -56,15 +63,60 @@ struct SearchHits: Codable {
         case maxScore = "max_score"
         case hits
     }
+
+    init(total: SearchTotal, maxScore: Double?, hits: [DocumentHit]) {
+        self.total = total
+        self.maxScore = maxScore
+        self.hits = hits
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        total = try container.decodeIfPresent(SearchTotal.self, forKey: .total) ?? SearchTotal(value: 0, relation: "eq")
+        maxScore = try container.decodeIfPresent(Double.self, forKey: .maxScore)
+        hits = try container.decodeIfPresent([DocumentHit].self, forKey: .hits) ?? []
+    }
 }
 
 struct SearchTotal: Codable {
     let value: Int
     let relation: String
+
+    init(value: Int, relation: String) {
+        self.value = value
+        self.relation = relation
+    }
+
+    init(from decoder: Decoder) throws {
+        let single = try decoder.singleValueContainer()
+        if let value = try? single.decode(Int.self) {
+            self.init(value: value, relation: "eq")
+            return
+        }
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            value: try container.decodeIfPresent(Int.self, forKey: .value) ?? 0,
+            relation: try container.decodeIfPresent(String.self, forKey: .relation) ?? "eq"
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case value
+        case relation
+    }
 }
 
 struct AnalyzeResponse: Codable {
     let tokens: [AnalyzeToken]
+
+    init(tokens: [AnalyzeToken]) {
+        self.tokens = tokens
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        tokens = (try? container.decode([AnalyzeToken].self, forKey: .tokens)) ?? []
+    }
 }
 
 struct AnalyzeToken: Codable, Identifiable {
@@ -75,6 +127,14 @@ struct AnalyzeToken: Codable, Identifiable {
     let position: Int
     
     var id: String { "\(position)-\(token)" }
+
+    init(token: String, startOffset: Int, endOffset: Int, type: String, position: Int) {
+        self.token = token
+        self.startOffset = startOffset
+        self.endOffset = endOffset
+        self.type = type
+        self.position = position
+    }
     
     enum CodingKeys: String, CodingKey {
         case token
@@ -82,6 +142,21 @@ struct AnalyzeToken: Codable, Identifiable {
         case endOffset = "end_offset"
         case type
         case position
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        token = try container.decode(String.self, forKey: .token)
+        startOffset = Self.decodeInt(container, key: .startOffset) ?? 0
+        endOffset = Self.decodeInt(container, key: .endOffset) ?? startOffset
+        type = try container.decodeIfPresent(String.self, forKey: .type) ?? "unknown"
+        position = Self.decodeInt(container, key: .position) ?? 0
+    }
+
+    private static func decodeInt(_ container: KeyedDecodingContainer<CodingKeys>, key: CodingKeys) -> Int? {
+        if let value = try? container.decode(Int.self, forKey: key) { return value }
+        if let value = try? container.decode(String.self, forKey: key) { return Int(value) }
+        return nil
     }
 }
 

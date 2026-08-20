@@ -2,7 +2,8 @@ import SwiftUI
 import Charts
 
 struct DevToolsView: View {
-    @State private var selectedTool: DevTool = .clusterHealth
+    @EnvironmentObject var indexVM: IndexViewModel
+    @State private var selectedTool: DevTool = .overview
     @State private var clusterHealth: [String: Any]?
     @State private var nodesInfo: [String: Any]?
     @State private var clusterStats: [String: Any]?
@@ -10,6 +11,7 @@ struct DevToolsView: View {
     @State private var errorMessage: String?
     
     enum DevTool: String, CaseIterable, Identifiable {
+        case overview = "概览"
         case clusterHealth = "集群健康"
         case nodesInfo = "节点信息"
         case clusterStats = "集群统计"
@@ -18,6 +20,7 @@ struct DevToolsView: View {
         
         var icon: String {
             switch self {
+            case .overview: return "rectangle.grid.1x2"
             case .clusterHealth: return "heart.text.square.fill"
             case .nodesInfo: return "server.rack"
             case .clusterStats: return "chart.bar.fill"
@@ -27,124 +30,90 @@ struct DevToolsView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Toolbar
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("控制台")
-                        .font(.system(size: 24, weight: .bold))
-                    Text("集群管理和调试工具")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer(minLength: 12)
-                
-                Button(action: {
-                    Task {
-                        await loadData()
+            HStack(spacing: 6) {
+                ForEach(DevTool.allCases) { tool in
+                    Button {
+                        selectedTool = tool
+                        Task { await refreshSelectedTool() }
+                    } label: {
+                        Label(tool.rawValue, systemImage: tool.icon)
+                            .font(.system(size: 12, weight: selectedTool == tool ? .semibold : .regular))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(selectedTool == tool ? Color.accentColor.opacity(0.14) : .clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
-                }) {
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+                Button {
+                    Task { await refreshSelectedTool() }
+                } label: {
                     Label("刷新", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.bordered)
                 .disabled(isLoading)
+                .help("刷新")
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-            
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             Divider()
-            
-            HSplitView {
-                // Tools List
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(DevTool.allCases) { tool in
-                        Button(action: {
-                            selectedTool = tool
-                            Task {
-                                await loadData()
-                            }
-                        }) {
-                            HStack(spacing: 10) {
-                                Image(systemName: tool.icon)
-                                    .frame(width: 20)
-                                Text(tool.rawValue)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(selectedTool == tool ? Color.blue.opacity(0.15) : Color.clear)
-                        )
-                    }
-                    Spacer(minLength: 0)
+            if isLoading {
+                VStack(spacing: 16) {
+                    ProgressView()
+                    Text("加载中...")
+                        .foregroundColor(.secondary)
                 }
-                .padding(8)
-                .frame(width: 180)
-                .frame(maxHeight: .infinity, alignment: .topLeading)
-                .background(Color(NSColor.controlBackgroundColor))
-                
-                // Content
-                VStack(spacing: 0) {
-                    if isLoading {
-                        VStack(spacing: 16) {
-                            ProgressView()
-                            Text("加载中...")
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    } else if let error = errorMessage {
-                        VStack(spacing: 16) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 48))
-                                .foregroundColor(.red)
-                            Text(error)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    } else {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 16) {
-                                switch selectedTool {
-                                case .clusterHealth:
-                                    if let health = clusterHealth {
-                                        ClusterHealthView(health: health)
-                                    }
-                                case .nodesInfo:
-                                    if let nodes = nodesInfo {
-                                        NodesInfoView(nodes: nodes)
-                                    }
-                                case .clusterStats:
-                                    if let stats = clusterStats {
-                                        ClusterStatsView(stats: stats)
-                                    }
-                                }
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.red)
+                    Text(error)
+                        .foregroundColor(.secondary)
                 }
-                .frame(minWidth: 400)
-                .frame(maxHeight: .infinity, alignment: .topLeading)
-                .background(Color(NSColor.textBackgroundColor))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        switch selectedTool {
+                        case .overview:
+                            OverviewSummaryView()
+                        case .clusterHealth:
+                            if let health = clusterHealth {
+                                ClusterHealthView(health: health)
+                            }
+                        case .nodesInfo:
+                            if let nodes = nodesInfo {
+                                NodesInfoView(nodes: nodes)
+                            }
+                        case .clusterStats:
+                            if let stats = clusterStats {
+                                ClusterStatsView(stats: stats)
+                            }
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(NSColor.windowBackgroundColor))
-        .onAppear {
-            Task {
-                await loadData()
-            }
+        .onAppear { Task { await refreshSelectedTool() } }
+    }
+
+    /// 刷新当前页签：概览复用索引视图模型，其余页签读取对应的集群接口。
+    private func refreshSelectedTool() async {
+        if selectedTool == .overview {
+            await indexVM.loadIndices()
+        } else {
+            await loadData()
         }
     }
-    
+
     private func loadData() async {
         guard ESAPIClient.shared.hasConnection else {
             errorMessage = "请先连接Elasticsearch"
@@ -156,6 +125,8 @@ struct DevToolsView: View {
         
         do {
             switch selectedTool {
+            case .overview:
+                break
             case .clusterHealth:
                 clusterHealth = try await ESAPIClient.shared.getClusterHealth()
             case .nodesInfo:
@@ -230,8 +201,6 @@ struct ClusterHealthView: View {
                 DevStatCard(title: "未分配", value: "\(health["unassigned_shards"] as? Int ?? 0)", icon: "exclamationmark.triangle", color: .orange)
             }
             
-            // Raw JSON
-            DevJSONSection(title: "原始数据", data: health)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -253,7 +222,6 @@ struct NodesInfoView: View {
                 }
             }
             
-            DevJSONSection(title: "原始数据", data: nodes)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -393,7 +361,6 @@ struct ClusterStatsView: View {
                 }
             }
             
-            DevJSONSection(title: "原始数据", data: stats)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -446,23 +413,5 @@ struct InfoRow: View {
                 .textSelection(.enabled)
         }
         .font(.callout)
-    }
-}
-
-struct DevJSONSection: View {
-    let title: String
-    let data: [String: Any]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            
-            if let jsonData = try? JSONSerialization.data(withJSONObject: data, options: .prettyPrinted),
-               let jsonString = String(data: jsonData, encoding: .utf8) {
-                ResponseViewer(attributedText: JSONFormatter.formatJSONString(jsonString))
-                    .frame(maxHeight: 300)
-            }
-        }
     }
 }

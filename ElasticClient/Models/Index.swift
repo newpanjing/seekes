@@ -9,10 +9,16 @@ struct IndexField: Identifiable {
 }
 
 struct Index: Identifiable, Codable, Hashable {
+    
+    //名字
     let name: String
+    //健康
     var health: IndexHealth
+    //状态
     var status: IndexStatus
+    //文档数量
     var docsCount: Int
+    //文档删除
     var docsDeleted: Int
     var storeSize: String
     var primaryShards: Int

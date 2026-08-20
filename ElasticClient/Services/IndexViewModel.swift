@@ -161,7 +161,9 @@ class IndexViewModel: ObservableObject {
             ?? (mappings.values.compactMap { $0 as? [String: Any] }
                 .compactMap { $0["properties"] as? [String: Any] }.first)
         guard let properties else { return [] }
-        return flattenFields(properties)
+        // _id 为 Elasticsearch 固有元字段，单独加入字段列表以便在查询时识别。
+        return [IndexField(name: "_id", type: "meta", isSearchable: true, isAggregatable: false)]
+            + flattenFields(properties)
     }
 
     private func flattenFields(_ properties: [String: Any], prefix: String = "") -> [IndexField] {
@@ -169,7 +171,9 @@ class IndexViewModel: ObservableObject {
             guard let config = properties[name] as? [String: Any] else { return [] }
             let fullName = prefix.isEmpty ? name : "\(prefix).\(name)"
             let type = config["type"] as? String ?? "object"
-            let field = IndexField(name: fullName, type: type, isSearchable: true, isAggregatable: type != "text")
+            let indexEnabled = (config["index"] as? Bool) ?? (config["index"] as? String != "false")
+            let searchable = indexEnabled && type != "object" && type != "nested"
+            let field = IndexField(name: fullName, type: type, isSearchable: searchable, isAggregatable: type != "text")
             let nested = (config["properties"] as? [String: Any]).map { flattenFields($0, prefix: fullName) } ?? []
             return [field] + nested
         }
@@ -208,6 +212,28 @@ class IndexViewModel: ObservableObject {
                 "number_of_replicas": numberOfReplicas
             ]
             _ = try await ESAPIClient.shared.createIndex(name: name, settings: settings)
+            await loadIndices()
+            showCreateIndexSheet = false
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    /// 按 Elasticsearch 原生 JSON 定义创建索引，允许同时提供 settings 与 mappings。
+    @MainActor
+    func createIndex(name: String, definitionJSON: String) async {
+        guard let data = definitionJSON.data(using: .utf8),
+              let definition = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            errorMessage = ESError.invalidBody.localizedDescription
+            return
+        }
+
+        isLoading = true
+        do {
+            let settings = definition["settings"] as? [String: Any]
+            let mappings = definition["mappings"] as? [String: Any]
+            _ = try await ESAPIClient.shared.createIndex(name: name, mappings: mappings, settings: settings)
             await loadIndices()
             showCreateIndexSheet = false
         } catch {
