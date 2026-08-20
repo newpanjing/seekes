@@ -249,6 +249,30 @@ class IndexViewModel: ObservableObject {
         }
         isLoading = false
     }
+
+    /// 保存映射编辑器内容，并刷新字段缓存。
+    @MainActor
+    func saveMappingJSON(_ jsonText: String) async -> Bool {
+        guard let indexName = selectedIndex?.name,
+              let data = jsonText.data(using: .utf8),
+              let mappings = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            errorMessage = ESError.invalidBody.localizedDescription
+            return false
+        }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            _ = try await ESAPIClient.shared.updateIndexMapping(indexName: indexName, mappings: mappings)
+            mappingData = try await ESAPIClient.shared.getIndexMapping(indexName: indexName)
+            fields = parseFields(from: mappingData, indexName: indexName)
+            indexFieldsMap[indexName] = fields
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
     
     func tabChanged(to tab: IndexTab) {
         selectedTab = tab

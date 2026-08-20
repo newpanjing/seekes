@@ -352,6 +352,13 @@ class ESAPIClient {
     func getIndexMapping(indexName: String) async throws -> Data {
         return try await rawRequest(path: "/\(indexName)/_mapping", method: "GET")
     }
+
+    /// 更新索引映射；Elasticsearch 仅允许新增字段及兼容性 mapping 变更。
+    func updateIndexMapping(indexName: String, mappings: [String: Any]) async throws -> Data {
+        let data = try JSONSerialization.data(withJSONObject: mappings)
+        let body = String(decoding: data, as: UTF8.self)
+        return try await rawRequest(path: "/\(indexName)/_mapping", method: "PUT", bodyString: body)
+    }
     
     func getIndexSettings(indexName: String) async throws -> Data {
         return try await rawRequest(path: "/\(indexName)/_settings", method: "GET")

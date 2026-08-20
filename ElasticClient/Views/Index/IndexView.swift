@@ -474,9 +474,45 @@ struct IndexTabBarView: View {
 
 struct IndexMappingView: View {
     let data: Data?
+    @EnvironmentObject var indexVM: IndexViewModel
+    @State private var isEditing = false
+    @State private var mappingJSON = "{}"
     
     var body: some View {
         VStack(spacing: 0) {
+            HStack {
+                Text("映射")
+                    .font(.subheadline.weight(.semibold))
+                if isEditing {
+                    Text("新增字段和兼容参数")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                if isEditing {
+                    Button("取消") { isEditing = false }
+                    Button("保存") {
+                        Task {
+                            if await indexVM.saveMappingJSON(mappingJSON) { isEditing = false }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                } else {
+                    Button {
+                        mappingJSON = mappingBodyText()
+                        isEditing = true
+                    } label: {
+                        Label("编辑映射", systemImage: "pencil")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            Divider()
+            if isEditing {
+                JSONEditor(text: $mappingJSON, showsLineNumbers: false)
+            } else {
             if let data = data,
                let jsonString = String(data: data, encoding: .utf8) {
                 ResponseViewer(attributedText: JSONFormatter.formatJSONString(jsonString))
@@ -487,8 +523,21 @@ struct IndexMappingView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func mappingBodyText() -> String {
+        guard let data,
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let indexName = indexVM.selectedIndex?.name,
+              let indexObject = root[indexName] as? [String: Any],
+              let mappings = indexObject["mappings"] as? [String: Any],
+              let result = try? JSONSerialization.data(withJSONObject: mappings, options: [.prettyPrinted]) else {
+            return "{\n  \"properties\": {}\n}"
+        }
+        return String(decoding: result, as: UTF8.self)
     }
 }
 
