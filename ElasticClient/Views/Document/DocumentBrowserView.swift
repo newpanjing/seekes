@@ -7,6 +7,14 @@ private enum DocumentToolbarLayout {
     static let controlSpacing: CGFloat = 4
 }
 
+private enum CreateDocumentSheetLayout {
+    static let width: CGFloat = 620
+    static let height: CGFloat = 520
+    static let contentHeight: CGFloat = 280
+    static let horizontalPadding: CGFloat = 16
+    static let verticalPadding: CGFloat = 12
+}
+
 struct DocumentSearchBarView: View {
     @EnvironmentObject var documentVM: DocumentViewModel
     @EnvironmentObject var indexVM: IndexViewModel
@@ -116,10 +124,12 @@ struct CreateDocumentSheet: View {
                 Text("新建文档").font(.headline)
                 Spacer()
                 Button { isPresented = false } label: { Image(systemName: "xmark") }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderless)
+                    .frame(width: 24, height: 24)
                     .help("关闭")
             }
-            .padding(12)
+            .padding(.horizontal, CreateDocumentSheetLayout.horizontalPadding)
+            .padding(.vertical, CreateDocumentSheetLayout.verticalPadding)
             Divider()
             VStack(alignment: .leading, spacing: 8) {
                 Text("文档 ID（可选）")
@@ -132,12 +142,12 @@ struct CreateDocumentSheet: View {
                     Text(error).font(.caption).foregroundColor(.red)
                 }
             }
-            .padding(12)
-            HStack {
+            .padding(.horizontal, CreateDocumentSheetLayout.horizontalPadding)
+            .padding(.vertical, CreateDocumentSheetLayout.verticalPadding)
+            VStack(alignment: .leading, spacing: 6) {
                 Text("文档内容")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.secondary)
-                Spacer()
                 Picker("内容格式", selection: $contentMode) {
                     ForEach(CreateDocumentContentMode.allCases) { mode in
                         Text(mode.title).tag(mode)
@@ -145,32 +155,46 @@ struct CreateDocumentSheet: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 190)
+                .frame(width: 250)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, CreateDocumentSheetLayout.horizontalPadding)
             .padding(.bottom, 6)
-            if contentMode == .json {
-                JSONEditor(text: $documentJSON)
-            } else if contentMode == .ui {
-                Form {
-                    if editableFields.isEmpty {
-                        Text("当前索引暂无可编辑字段").foregroundColor(.secondary)
-                    } else {
-                        ForEach(editableFields) { field in
-                            TextField("\(field.name)（\(field.type)）", text: Binding(
-                                get: { uiValues[field.name, default: ""] },
-                                set: { uiValues[field.name] = $0 }
-                            ))
+
+            Group {
+                if contentMode == .json {
+                    JSONEditor(text: $documentJSON)
+                } else if contentMode == .ui {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            if editableFields.isEmpty {
+                                Text("当前索引暂无可编辑字段")
+                                    .foregroundColor(.secondary)
+                            } else {
+                                ForEach(editableFields) { field in
+                                    TextField("\(field.name)（\(field.type)）", text: Binding(
+                                        get: { uiValues[field.name, default: ""] },
+                                        set: { uiValues[field.name] = $0 }
+                                    ))
+                                    .textFieldStyle(.roundedBorder)
+                                }
+                            }
                         }
+                        .padding(CreateDocumentSheetLayout.horizontalPadding)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                } else {
+                    EmptyView()
                 }
-                .formStyle(.grouped)
-            } else {
-                ConsoleEditor(text: $documentJSON)
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: CreateDocumentSheetLayout.contentHeight)
+            .clipped()
+            .layoutPriority(1)
+
             Divider()
             HStack {
-                Button { isPresented = false } label: { Image(systemName: "xmark") }
+                Button { isPresented = false } label: { Label("取消", systemImage: "xmark") }
                     .buttonStyle(.bordered)
                     .help("取消")
                     .keyboardShortcut(.cancelAction)
@@ -188,9 +212,10 @@ struct CreateDocumentSheet: View {
                 .disabled(documentVM.isLoading)
                 .keyboardShortcut(.defaultAction)
             }
-            .padding(12)
+            .padding(.horizontal, CreateDocumentSheetLayout.horizontalPadding)
+            .padding(.vertical, CreateDocumentSheetLayout.verticalPadding)
         }
-        .frame(width: 620, height: 520)
+        .frame(width: CreateDocumentSheetLayout.width, height: CreateDocumentSheetLayout.height)
     }
 
     /// 将 UI 字段值转换为文档 JSON，数值和布尔字段按类型输出原生值。
@@ -216,14 +241,12 @@ struct CreateDocumentSheet: View {
 private enum CreateDocumentContentMode: String, CaseIterable, Identifiable {
     case json
     case ui
-    case text
 
     var id: String { rawValue }
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .json: return "JSON 编辑器"
         case .ui: return "可视化"
-        case .text: return "原文"
         }
     }
 }
@@ -234,7 +257,7 @@ struct DocumentListView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("共 \(documentVM.totalResults.formatted()) 条")
+                Text("结果数量 \(documentVM.totalResults.formatted())")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
 
@@ -293,7 +316,7 @@ struct DocumentListView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundColor(.orange)
-                    Text(documentVM.errorMessage ?? "加载失败")
+                    Text(documentVM.errorMessage ?? AppLanguage.localizedString("加载失败"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -333,8 +356,8 @@ struct DocumentListView: View {
                                 Button("删除", role: .destructive) {
                                     documentVM.selectDocument(doc)
                                     NSAlert.showConfirmation(
-                                        title: "删除文档",
-                                        message: "确定要删除文档 \(doc.id) 吗？此操作不可撤销。"
+                                        title: AppLanguage.localizedString("删除文档"),
+                                        message: String(format: AppLanguage.localizedString("确定要删除文档 %@ 吗？此操作不可撤销。"), doc.id)
                                     ) { confirmed in
                                         if confirmed {
                                             Task { await documentVM.deleteDocument() }
@@ -444,8 +467,8 @@ struct JSONViewerTextView: View {
 
                         Button(action: {
                             NSAlert.showConfirmation(
-                                title: "删除文档",
-                                message: "确定要删除文档 \(documentVM.selectedDocument?.id ?? "") 吗？此操作不可撤销。"
+                                title: AppLanguage.localizedString("删除文档"),
+                                message: String(format: AppLanguage.localizedString("确定要删除文档 %@ 吗？此操作不可撤销。"), documentVM.selectedDocument?.id ?? "")
                             ) { confirmed in
                                 if confirmed {
                                     Task {
@@ -510,16 +533,25 @@ struct JSONViewerTextView: View {
 
 struct DocumentPaginationView: View {
     @EnvironmentObject var documentVM: DocumentViewModel
+    @Environment(\.locale) private var locale
     
     var body: some View {
         HStack {
-            Text("检索结果 (\(documentVM.totalResults.formatted()))")
-                .font(.system(size: 13, weight: .medium))
+            HStack(spacing: 0) {
+                Text(verbatim: AppLanguage.localized("result_search", locale: locale))
+                    .font(.system(size: 13, weight: .medium))
+                Text(" (\(documentVM.totalResults.formatted()))")
+                    .font(.system(size: 13, weight: .medium))
+            }
 
             if let duration = documentVM.lastQueryDuration {
-                Text("ES \(documentVM.took) ms · 总计 \(Int((duration * 1000).rounded())) ms")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                HStack(spacing: 0) {
+                    Text(verbatim: String(format: AppLanguage.localized("result_es_duration", locale: locale), documentVM.took))
+                    Text(" · ")
+                    Text(verbatim: String(format: AppLanguage.localized("result_total_duration", locale: locale), Int((duration * 1000).rounded())))
+                }
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
             }
             
             Spacer(minLength: 12)
@@ -612,7 +644,7 @@ struct DocumentPaginationView: View {
             Spacer(minLength: 12)
             
             HStack(spacing: 8) {
-                Text("每页")
+                Text(String(localized: "每页", locale: locale))
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                 
@@ -654,7 +686,7 @@ struct DocumentPaginationView: View {
                 }
                 .buttonStyle(.plain)
                 
-                Text("条")
+                Text(String(localized: "条", locale: locale))
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
@@ -668,8 +700,8 @@ extension NSAlert {
             let alert = NSAlert()
             alert.messageText = title
             alert.informativeText = message
-            alert.addButton(withTitle: "删除")
-            alert.addButton(withTitle: "取消")
+            alert.addButton(withTitle: AppLanguage.localizedString("删除"))
+            alert.addButton(withTitle: AppLanguage.localizedString("取消"))
             alert.alertStyle = .warning
             
             let response = alert.runModal()

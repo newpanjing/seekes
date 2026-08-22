@@ -127,6 +127,7 @@ struct IndexDetailView: View {
 struct DataTabView: View {
     @EnvironmentObject var documentVM: DocumentViewModel
     @EnvironmentObject var indexVM: IndexViewModel
+    @EnvironmentObject var appState: AppState
     @State private var showCreateDocument = false
     
     var body: some View {
@@ -173,6 +174,8 @@ struct DataTabView: View {
             CreateDocumentSheet(isPresented: $showCreateDocument)
                 .environmentObject(documentVM)
                 .environmentObject(indexVM)
+                .environment(\.locale, appState.language.locale)
+                .id(appState.language.rawValue)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -193,6 +196,7 @@ struct CreateIndexSheet: View {
         case json = "JSON"
 
         var id: String { rawValue }
+        var title: LocalizedStringKey { LocalizedStringKey(rawValue) }
     }
     
     var body: some View {
@@ -209,7 +213,7 @@ struct CreateIndexSheet: View {
 
                 Picker("创建方式", selection: $mode) {
                     ForEach(CreationMode.allCases) { item in
-                        Text(item.rawValue).tag(item)
+                        Text(item.title).tag(item)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -320,6 +324,139 @@ struct CreateIndexField: Identifiable {
     static let types = ["keyword", "text", "integer", "long", "float", "double", "boolean", "date", "ip", "object", "nested"]
 }
 
+struct IndexEditSheet: View {
+    @EnvironmentObject var indexVM: IndexViewModel
+    @Environment(\.dismiss) private var dismiss
+    let indexName: String
+    @State private var mode: IndexEditMode = .json
+    @State private var mappingJSON = "{}"
+    @State private var fields: [EditableIndexField] = []
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("修改索引").font(.headline)
+                Spacer()
+                Picker("编辑方式", selection: $mode) {
+                    ForEach(IndexEditMode.allCases) { item in
+                        Text(item.title).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 220)
+                Button { dismiss() } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.borderless)
+            }
+            .padding(12)
+            Divider()
+
+            if mode == .json {
+                JSONEditor(text: $mappingJSON, showsLineNumbers: false)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 12) {
+                        Text("字段名")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("类型")
+                            .frame(width: 150, alignment: .leading)
+                        Color.clear.frame(width: 24)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+
+                    Divider()
+
+                    ForEach($fields) { $field in
+                        HStack(spacing: 12) {
+                            TextField("字段名", text: $field.name)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                            Picker("类型", selection: $field.type) {
+                                ForEach(CreateIndexField.types, id: \.self) { type in
+                                    Text(type).tag(type)
+                                }
+                            }
+                            .frame(width: 150)
+                            Button {
+                                fields.removeAll { $0.id == field.id }
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("删除字段")
+                            .frame(width: 24)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        Divider()
+                    }
+
+                    HStack {
+                        Button { fields.append(EditableIndexField()) } label: {
+                            Label("新增字段", systemImage: "plus")
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer()
+                    }
+                    .padding(12)
+                }
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(12)
+            }
+
+            Divider()
+            HStack {
+                Button("取消") { dismiss() }
+                Spacer()
+                Button("保存") {
+                    Task {
+                        let json = mode == .json ? mappingJSON : visualMappingJSON
+                        if await indexVM.saveMappingJSON(json) { dismiss() }
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(12)
+        }
+        .frame(width: 680, height: 520)
+        .onAppear {
+            mappingJSON = mappingBodyText()
+            fields = (indexVM.indexFieldsMap[indexName] ?? []).map { EditableIndexField(name: $0.name, type: $0.type) }
+        }
+    }
+
+    private var visualMappingJSON: String {
+        let properties = Dictionary(uniqueKeysWithValues: fields.filter { !$0.name.isEmpty }.map { ($0.name, ["type": $0.type]) })
+        guard let data = try? JSONSerialization.data(withJSONObject: ["properties": properties], options: [.prettyPrinted]) else { return "{}" }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private func mappingBodyText() -> String {
+        guard let data = indexVM.mappingData,
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let mappings = object["mappings"] as? [String: Any],
+              let pretty = try? JSONSerialization.data(withJSONObject: mappings, options: [.prettyPrinted]) else { return "{}" }
+        return String(decoding: pretty, as: UTF8.self)
+    }
+}
+
+private enum IndexEditMode: String, CaseIterable, Identifiable {
+    case json
+    case visual
+    var id: String { rawValue }
+    var title: LocalizedStringKey { self == .json ? "JSON" : "可视化" }
+}
+
+private struct EditableIndexField: Identifiable {
+    let id = UUID()
+    var name = ""
+    var type = "keyword"
+    init(name: String = "", type: String = "keyword") { self.name = name; self.type = type }
+}
+
 struct IndexInfoHeaderView: View {
     let index: Index
     
@@ -420,7 +557,7 @@ private struct IndexHealthDetailSheet: View {
 }
 
 struct InfoItem: View {
-    let label: String
+    let label: LocalizedStringKey
     let value: String
     
     var body: some View {
@@ -599,7 +736,7 @@ struct IndexStatsView: View {
 }
 
 struct StatsCard: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let icon: String
     let color: Color

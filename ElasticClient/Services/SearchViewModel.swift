@@ -14,7 +14,7 @@ class SearchViewModel: ObservableObject {
     
     func performSearch() async {
         guard ESAPIClient.shared.hasConnection else {
-            errorMessage = "请先连接Elasticsearch"
+            errorMessage = AppLanguage.localizedString("请先连接Elasticsearch")
             return
         }
         

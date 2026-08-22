@@ -130,8 +130,8 @@ struct DocumentOperationPanelView: View {
                         isDestructive: true
                     ) {
                         NSAlert.showConfirmation(
-                            title: "删除文档",
-                            message: "确定要删除该文档吗？此操作不可撤销。"
+                            title: AppLanguage.localizedString("删除文档"),
+                            message: AppLanguage.localizedString("确定要删除该文档吗？此操作不可撤销。")
                         ) { confirmed in
                             if confirmed {
                                 Task {
@@ -196,7 +196,7 @@ struct DocumentOperationPanelView: View {
 
 struct OperationButton: View {
     let icon: String
-    let title: String
+    let title: LocalizedStringKey
     let isSelected: Bool
     let hasIndicator: Bool
     var isDestructive: Bool = false

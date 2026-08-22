@@ -129,7 +129,7 @@ class DocumentViewModel: ObservableObject {
                     query = parsed
                 }
             } else if !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                errorMessage = "JSON 格式错误"
+                errorMessage = AppLanguage.localizedString("JSON 格式错误")
                 isLoading = false
                 return
             } else {
@@ -185,11 +185,11 @@ class DocumentViewModel: ObservableObject {
         do {
             guard let jsonData = editJsonText.data(using: .utf8),
                   let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-                errorMessage = "JSON格式错误"
+                errorMessage = AppLanguage.localizedString("JSON 格式错误")
                 isLoading = false
                 return
             }
-            
+
             var source = json
             source.removeValue(forKey: "_index")
             source.removeValue(forKey: "_id")
@@ -236,12 +236,12 @@ class DocumentViewModel: ObservableObject {
     @MainActor
     func createDocument(id: String, jsonText: String) async -> Bool {
         guard let indexName = currentIndex else {
-            errorMessage = "请先选择索引"
+            errorMessage = AppLanguage.localizedString("请先选择索引")
             return false
         }
         guard let data = jsonText.data(using: .utf8),
               let document = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            errorMessage = "JSON 格式错误"
+            errorMessage = AppLanguage.localizedString("JSON 格式错误")
             return false
         }
 
@@ -267,7 +267,7 @@ class DocumentViewModel: ObservableObject {
     func getDocumentJSON() -> NSAttributedString {
         guard let doc = selectedDocumentDetail,
               let source = doc.source else {
-            return NSAttributedString(string: "选择一个文档查看详情", attributes: [.foregroundColor: NSColor.secondaryLabelColor])
+            return NSAttributedString(string: AppLanguage.localizedString("选择一个文档查看详情"), attributes: [.foregroundColor: NSColor.secondaryLabelColor])
         }
         
         let sourceDict = sourceDictionary(from: source)
@@ -279,7 +279,7 @@ class DocumentViewModel: ObservableObject {
         guard let doc = selectedDocumentDetail,
               let source = doc.source,
               let data = try? JSONSerialization.data(withJSONObject: sourceDictionary(from: source), options: [.prettyPrinted]) else {
-            return "选择一个文档查看详情"
+            return AppLanguage.localizedString("选择一个文档查看详情")
         }
         return String(decoding: data, as: UTF8.self)
     }
@@ -335,7 +335,7 @@ class DocumentViewModel: ObservableObject {
     func executeConsoleQuery() async {
         checkConnectionStatus()
         guard isConnected else {
-            errorMessage = "请先连接Elasticsearch"
+            errorMessage = AppLanguage.localizedString("请先连接Elasticsearch")
             return
         }
         

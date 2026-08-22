@@ -71,7 +71,7 @@ struct ConsoleView: View {
                         }
                         Divider()
                         
-                        ResponseViewer(attributedText: documentVM.consoleResult ?? NSAttributedString(string: "执行查询后将在此显示结果...", attributes: [.foregroundColor: NSColor.secondaryLabelColor]))
+                        ResponseViewer(attributedText: documentVM.consoleResult ?? NSAttributedString(string: AppLanguage.localizedString("执行查询后将在此显示结果..."), attributes: [.foregroundColor: NSColor.secondaryLabelColor]))
                     }
                 }
             }

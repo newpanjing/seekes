@@ -3,7 +3,7 @@ import SwiftUI
 struct AnalyzerView: View {
     @EnvironmentObject var indexVM: IndexViewModel
     @State private var analyzeMode: AnalyzeMode = .standard
-    @State private var inputText: String = "Elasticsearch 是一个分布式的 RESTful 搜索和分析引擎"
+    @State private var inputText = ""
     @State private var fieldName: String = ""
     @State private var selectedIndex: String = ""
     @State private var tokenizer: String = "standard"
@@ -25,6 +25,8 @@ struct AnalyzerView: View {
         case indexField = "索引字段分词"
         
         var id: String { rawValue }
+
+        var title: LocalizedStringKey { LocalizedStringKey(rawValue) }
         
         var analyzerName: String? {
             switch self {
@@ -57,7 +59,7 @@ struct AnalyzerView: View {
                                         analyzeMode = mode
                                         tokens = []
                                     }) {
-                                        Text(mode.rawValue)
+                                        Text(mode.title)
                                             .font(.system(size: 12))
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 6)
@@ -126,14 +128,23 @@ struct AnalyzerView: View {
                         Text("待分词文本")
                             .font(.headline)
                         
-                        TextEditor(text: $inputText)
-                            .font(.system(size: 14))
-                            .frame(minHeight: 80, maxHeight: 140)
-                            .padding(8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                            )
+                        ZStack(alignment: .topLeading) {
+                            TextEditor(text: $inputText)
+                                .font(.system(size: 14))
+                                .padding(8)
+                            if inputText.isEmpty {
+                                Text("输入要分析的文本")
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 15)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        .frame(minHeight: 80, maxHeight: 140)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                     }
                     
                     // Analyze Button
@@ -266,7 +277,7 @@ struct AnalyzerView: View {
     
     private func performAnalyze() async {
         guard ESAPIClient.shared.hasConnection else {
-            errorMessage = "请先连接Elasticsearch"
+            errorMessage = AppLanguage.localizedString("请先连接Elasticsearch")
             return
         }
         
@@ -280,7 +291,7 @@ struct AnalyzerView: View {
             switch analyzeMode {
             case .indexField:
                 guard !selectedIndex.isEmpty, !fieldName.isEmpty else {
-                    errorMessage = "请选择索引并输入字段名"
+                    errorMessage = AppLanguage.localizedString("请选择索引并输入字段名")
                     isAnalyzing = false
                     return
                 }

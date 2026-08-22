@@ -123,23 +123,23 @@ enum ESError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "无效的URL"
+            return AppLanguage.localizedString("无效的URL")
         case .networkError(let error):
-            return "网络错误: \(error.localizedDescription)"
+            return String(format: AppLanguage.localizedString("网络错误: %@"), error.localizedDescription)
         case .invalidResponse:
-            return "无效的响应"
+            return AppLanguage.localizedString("无效的响应")
         case .httpError(let code, let message):
-            return "HTTP错误 \(code): \(message ?? "")"
+            return String(format: AppLanguage.localizedString("HTTP错误 %ld: %@"), code, message ?? "")
         case .decodingError(let error):
-            return "解析错误: \(error.localizedDescription)"
+            return String(format: AppLanguage.localizedString("解析错误: %@"), error.localizedDescription)
         case .unauthorized:
-            return "未授权访问，请检查用户名密码"
+            return AppLanguage.localizedString("未授权访问，请检查用户名密码")
         case .notFound:
-            return "资源未找到"
+            return AppLanguage.localizedString("资源未找到")
         case .noConnectionConfigured:
-            return "请先配置Elasticsearch连接"
+            return AppLanguage.localizedString("请先配置Elasticsearch连接")
         case .invalidBody:
-            return "请求体格式错误"
+            return AppLanguage.localizedString("请求体格式错误")
         }
     }
 }

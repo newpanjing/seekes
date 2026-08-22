@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 struct IndexField: Identifiable {
     let id = UUID()
@@ -33,7 +34,7 @@ struct Index: Identifiable, Codable, Hashable {
         case yellow = "yellow"
         case red = "red"
         
-        var displayText: String {
+        var displayText: LocalizedStringKey {
             switch self {
             case .green: return "正常"
             case .yellow: return "警告"

@@ -131,7 +131,7 @@ struct ClusterInfoCard: View {
 }
 
 struct OverviewStatCard: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let icon: String
     let color: Color

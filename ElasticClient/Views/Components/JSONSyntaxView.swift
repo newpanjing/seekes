@@ -144,12 +144,12 @@ struct CollapsibleJSONView: NSViewRepresentable {
             outlineView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
 
             let menu = NSMenu()
-            menu.addItem(copyItem(title: "复制", value: node.displayText))
+            menu.addItem(copyItem(title: AppLanguage.localizedString("复制"), value: node.displayText))
             if let key = node.key {
-                menu.addItem(copyItem(title: "复制键", value: key))
+                menu.addItem(copyItem(title: AppLanguage.localizedString("复制键"), value: key))
             }
-            menu.addItem(copyItem(title: "复制值", value: node.valueText))
-            menu.addItem(copyItem(title: "复制全部", value: node.fullText))
+            menu.addItem(copyItem(title: AppLanguage.localizedString("复制值"), value: node.valueText))
+            menu.addItem(copyItem(title: AppLanguage.localizedString("复制全部"), value: node.fullText))
             return menu
         }
 

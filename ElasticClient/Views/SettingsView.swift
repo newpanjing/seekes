@@ -72,7 +72,7 @@ struct SettingsView: View {
 }
 
 struct SettingsSection<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     let icon: String
     @ViewBuilder let content: () -> Content
     
@@ -105,7 +105,7 @@ struct SettingsSection<Content: View>: View {
 
 struct SettingsItem<Content: View>: View {
     let icon: String
-    let title: String
+    let title: LocalizedStringKey
     let iconColor: Color
     @ViewBuilder let content: () -> Content
     

@@ -2,7 +2,10 @@ import SwiftUI
 
 struct IndexListView: View {
     @EnvironmentObject var indexVM: IndexViewModel
+    @EnvironmentObject var appState: AppState
     let onRefresh: () -> Void
+    @State private var editingIndexName = ""
+    @State private var showIndexEditor = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -55,6 +58,12 @@ struct IndexListView: View {
                             indexVM.selectIndex(index)
                         }
                         .contextMenu {
+                            Button("修改索引") {
+                                editingIndexName = index.name
+                                showIndexEditor = true
+                                indexVM.selectIndex(index)
+                                indexVM.selectedTab = .mapping
+                            }
                             Button("查看数据") { indexVM.selectIndex(index) }
                             Button("查看映射") {
                                 indexVM.selectIndex(index)
@@ -64,8 +73,8 @@ struct IndexListView: View {
                             Divider()
                             Button("删除索引", role: .destructive) {
                                 NSAlert.showConfirmation(
-                                    title: "删除索引",
-                                    message: "确定要删除索引 \(index.name) 吗？索引中的所有文档都会被删除。"
+                                    title: AppLanguage.localizedString("删除索引"),
+                                    message: String(format: AppLanguage.localizedString("确定要删除索引 %@ 吗？索引中的所有文档都会被删除。"), index.name)
                                 ) { confirmed in
                                     if confirmed {
                                         Task { await indexVM.deleteIndex(index) }
@@ -82,7 +91,13 @@ struct IndexListView: View {
             
             // Footer
             HStack {
-                Text("共 \(indexVM.indices.count) 个索引")
+                Text("共")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                Text("\(indexVM.indices.count)")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                Text("个索引")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                 Spacer(minLength: 0)
@@ -91,6 +106,12 @@ struct IndexListView: View {
             .padding(.vertical, 8)
         }
         .background(Color(NSColor.textBackgroundColor))
+        .sheet(isPresented: $showIndexEditor) {
+            IndexEditSheet(indexName: editingIndexName)
+                .environmentObject(indexVM)
+                .environment(\.locale, appState.language.locale)
+                .id(appState.language.rawValue)
+        }
     }
 
     /// 索引列表顶部使用统一尺寸的图标操作按钮。
@@ -148,11 +169,16 @@ struct IndexListRow: View {
                     }
                     
                     HStack(spacing: 8) {
-                        Text("\(index.docsCount.formatted()) 文档")
+                        Text("\(index.docsCount.formatted())")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
-                        
-                        Text("\(fields.count) 字段")
+                        Text("文档")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                        Text("\(fields.count)")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                        Text("字段")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }

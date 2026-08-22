@@ -69,6 +69,8 @@ struct MainView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+                .environment(\.locale, appState.language.locale)
+                .id(appState.language.rawValue)
         }
         .onChange(of: appState.isConnected) { _, _ in
             NotificationCenter.default.post(name: .connectionStatusChanged, object: nil)

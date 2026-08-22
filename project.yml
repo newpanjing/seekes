@@ -28,15 +28,15 @@ targets:
           - Assets.xcassets
       - path: ElasticClient/Assets.xcassets
         buildPhase: resources
-      - path: ElasticClient/en.lproj
+      - path: ElasticClient/en.lproj/Localizable.strings
         buildPhase: resources
-      - path: ElasticClient/zh-Hans.lproj
+      - path: ElasticClient/zh-Hans.lproj/Localizable.strings
         buildPhase: resources
-      - path: ElasticClient/ja.lproj
+      - path: ElasticClient/ja.lproj/Localizable.strings
         buildPhase: resources
-      - path: ElasticClient/ko.lproj
+      - path: ElasticClient/ko.lproj/Localizable.strings
         buildPhase: resources
-      - path: ElasticClient/ru.lproj
+      - path: ElasticClient/ru.lproj/Localizable.strings
         buildPhase: resources
     settings:
       base:

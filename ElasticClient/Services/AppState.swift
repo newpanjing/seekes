@@ -43,7 +43,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self {
         case .system: return "跟随系统"
         case .english: return "English"
-        case .chinese: return "中文"
+        case .chinese: return "中文简体"
         case .japanese: return "日本語"
         case .korean: return "한국어"
         case .russian: return "Русский"
@@ -52,6 +52,24 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     var locale: Locale {
         self == .system ? .current : Locale(identifier: rawValue)
+    }
+
+    static func localized(_ key: String, locale: Locale) -> String {
+        let identifiers = [locale.identifier, locale.language.languageCode?.identifier].compactMap { $0 }
+        for identifier in identifiers {
+            guard let path = Bundle.main.path(forResource: identifier, ofType: "lproj"),
+                  let bundle = Bundle(path: path) else { continue }
+            return bundle.localizedString(forKey: key, value: key, table: nil)
+        }
+        return Bundle.main.localizedString(forKey: key, value: key, table: nil)
+    }
+
+    /// 当前生效语言，供无法访问 SwiftUI 环境的模型、网络与服务层使用；由 AppState 维护。
+    static var current: AppLanguage = .system
+
+    /// 以当前应用语言翻译字符串；带占位符时请配合 `String(format:)` 使用。
+    static func localizedString(_ key: String) -> String {
+        localized(key, locale: current.locale)
     }
 }
 
@@ -73,6 +91,7 @@ class AppState: ObservableObject {
     }
     @Published var language: AppLanguage = .system {
         didSet {
+            AppLanguage.current = language
             if !isRestoringPersistentState { saveSettings() }
         }
     }
@@ -280,7 +299,7 @@ class AppState: ObservableObject {
         do {
             try modelContext.save()
         } catch {
-            errorMessage = "本地数据保存失败：\(error.localizedDescription)"
+            errorMessage = String(format: AppLanguage.localizedString("本地数据保存失败：%@"), error.localizedDescription)
             print("SeekES SwiftData save failed: \(error)")
         }
     }

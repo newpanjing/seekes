@@ -173,7 +173,7 @@ struct SearchResultRow: View {
     let isSelected: Bool
     
     private var previewText: String {
-        guard let source = hit.source else { return "无内容" }
+        guard let source = hit.source else { return AppLanguage.localizedString("无内容") }
         if let firstKey = source.keys.first,
            let value = source[firstKey] {
             return "\(firstKey): \(String(describing: value.value).prefix(50))"

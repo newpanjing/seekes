@@ -68,8 +68,8 @@ struct ConnectionManagementView: View {
                             },
                             onDelete: {
                                 NSAlert.showConfirmation(
-                                    title: "删除连接",
-                                    message: "确定要删除连接 \(connection.name) 吗？此操作不可撤销。"
+                                    title: AppLanguage.localizedString("删除连接"),
+                                    message: String(format: AppLanguage.localizedString("确定要删除连接 %@ 吗？此操作不可撤销。"), connection.name)
                                 ) { confirmed in
                                     if confirmed { appState.deleteConnection(connection) }
                                 }
@@ -354,7 +354,7 @@ struct ConnectionEditView: View {
     
     private func testConnection() {
         guard let portInt = Int(port) else {
-            testResult = (false, "端口必须是数字")
+            testResult = (false, AppLanguage.localizedString("端口必须是数字"))
             return
         }
         
@@ -374,12 +374,12 @@ struct ConnectionEditView: View {
             do {
                 let clusterInfo = try await ESAPIClient.shared.getClusterInfo()
                 await MainActor.run {
-                    testResult = (true, "连接成功！集群: \(clusterInfo.clusterName), 版本: \(clusterInfo.version.number)")
+                    testResult = (true, String(format: AppLanguage.localizedString("连接成功！集群: %@, 版本: %@"), clusterInfo.clusterName, clusterInfo.version.number))
                     isTesting = false
                 }
             } catch {
                 await MainActor.run {
-                    testResult = (false, "连接失败: \(error.localizedDescription)")
+                    testResult = (false, String(format: AppLanguage.localizedString("连接失败: %@"), error.localizedDescription))
                     isTesting = false
                 }
             }
@@ -410,7 +410,7 @@ struct ConnectionEditView: View {
 }
 
 struct FormField<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     var placeholder: String? = nil
     @ViewBuilder let content: () -> Content
     

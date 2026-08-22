@@ -11,7 +11,7 @@ struct SeekESApp: App {
         do {
             container = try ModelContainer(for: StoredConnection.self, StoredAppSettings.self)
         } catch {
-            fatalError("无法初始化本地数据库: \(error.localizedDescription)")
+            fatalError(String(format: AppLanguage.localizedString("无法初始化本地数据库: %@"), error.localizedDescription))
         }
         modelContainer = container
         _appState = StateObject(wrappedValue: AppState(modelContext: container.mainContext))
@@ -22,6 +22,9 @@ struct SeekESApp: App {
             MainView()
                 .environmentObject(appState)
                 .environment(\.locale, appState.language.locale)
+                // Recreate the scene when the selected locale changes so every
+                // localized SwiftUI label resolves against the new bundle.
+                .id(appState.language.rawValue)
                 .frame(minWidth: 1200, minHeight: 800)
         }
         .modelContainer(modelContainer)

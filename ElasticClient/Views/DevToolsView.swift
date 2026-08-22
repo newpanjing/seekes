@@ -17,6 +17,8 @@ struct DevToolsView: View {
         case clusterStats = "集群统计"
         
         var id: String { rawValue }
+
+        var title: LocalizedStringKey { LocalizedStringKey(rawValue) }
         
         var icon: String {
             switch self {
@@ -36,7 +38,7 @@ struct DevToolsView: View {
                         selectedTool = tool
                         Task { await refreshSelectedTool() }
                     } label: {
-                        Label(tool.rawValue, systemImage: tool.icon)
+                        Label(tool.title, systemImage: tool.icon)
                             .font(.system(size: 12, weight: selectedTool == tool ? .semibold : .regular))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
@@ -116,7 +118,7 @@ struct DevToolsView: View {
 
     private func loadData() async {
         guard ESAPIClient.shared.hasConnection else {
-            errorMessage = "请先连接Elasticsearch"
+            errorMessage = AppLanguage.localizedString("请先连接Elasticsearch")
             return
         }
         
@@ -208,11 +210,12 @@ struct ClusterHealthView: View {
 
 struct NodesInfoView: View {
     let nodes: [String: Any]
+    @Environment(\.locale) private var locale
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let nodesDict = nodes["nodes"] as? [String: Any] {
-                Text("节点列表 (\(nodesDict.count))")
+                Text(verbatim: String(format: AppLanguage.localized("nodes_list", locale: locale), nodesDict.count))
                     .font(.headline)
                 
                 ForEach(Array(nodesDict.keys.sorted()), id: \.self) { nodeId in
@@ -283,21 +286,22 @@ struct NodeInfoCard: View {
 
 struct ClusterStatsView: View {
     let stats: [String: Any]
+    @Environment(\.locale) private var locale
 
     private var chartMetrics: [(String, Int)] {
         guard let indices = stats["indices"] as? [String: Any] else { return [] }
         let docs = indices["docs"] as? [String: Any]
         return [
-            ("索引", indices["count"] as? Int ?? 0),
-            ("文档", docs?["count"] as? Int ?? 0),
-            ("已删除", docs?["deleted"] as? Int ?? 0)
+            ("metric_indices", indices["count"] as? Int ?? 0),
+            ("metric_documents", docs?["count"] as? Int ?? 0),
+            ("metric_deleted", docs?["deleted"] as? Int ?? 0)
         ]
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             if let clusterName = stats["cluster_name"] as? String {
-                Text("集群: \(clusterName)")
+                Text(verbatim: String(format: AppLanguage.localized("cluster_name", locale: locale), clusterName))
                     .font(.headline)
             }
             
@@ -324,8 +328,8 @@ struct ClusterStatsView: View {
                 if !chartMetrics.isEmpty {
                     Chart(chartMetrics, id: \.0) { metric in
                         BarMark(
-                            x: .value("指标", metric.0),
-                            y: .value("数量", metric.1)
+                            x: .value(AppLanguage.localized("chart_metric", locale: locale), AppLanguage.localized(metric.0, locale: locale)),
+                            y: .value(AppLanguage.localized("chart_value", locale: locale), metric.1)
                         )
                         .foregroundStyle(.blue.gradient)
                     }
@@ -367,7 +371,7 @@ struct ClusterStatsView: View {
 }
 
 struct DevStatCard: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let icon: String
     var color: Color = .blue
@@ -401,7 +405,7 @@ struct DevStatCard: View {
 }
 
 struct InfoRow: View {
-    let label: String
+    let label: LocalizedStringKey
     let value: String
     
     var body: some View {

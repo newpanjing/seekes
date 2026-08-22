@@ -4,6 +4,7 @@ import AppKit
 /// 独立查询页，支持原始 DSL 与可视化条件，并展示高亮后的原始响应。
 struct QueryView: View {
     @EnvironmentObject var indexVM: IndexViewModel
+    @Environment(\.locale) private var locale
     @State private var queryMode: DocumentQueryMode = .json
     @State private var selectedIndex = ""
     @State private var rawQuery = Self.defaultQuery
@@ -173,7 +174,7 @@ struct QueryView: View {
 
             Divider()
             HStack(spacing: 12) {
-                Text(queryDuration.map { String(format: "查询用时 %.0f ms", $0 * 1000) } ?? "尚未执行查询")
+                    Text(queryDuration.map { String(format: localized(QueryLocalizationKey.duration), $0 * 1000) } ?? localized(QueryLocalizationKey.notExecuted))
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Spacer()
@@ -188,7 +189,7 @@ struct QueryView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(currentPage == 1 || isLoading)
-                    Text("第 \(currentPage) / \(totalPages) 页，共 \(totalResults.formatted()) 条")
+                    Text(String(format: localized(QueryLocalizationKey.pagination), currentPage, totalPages, totalResults.formatted()))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Button {
@@ -203,14 +204,14 @@ struct QueryView: View {
                     .disabled(currentPage >= totalPages || isLoading)
                     Menu {
                         ForEach([10, 20, 50], id: \.self) { size in
-                            Button("\(size) 条") {
+                            Button(String(format: localized(QueryLocalizationKey.pageSizeOption), size)) {
                                 pageSize = size
                                 currentPage = 1
                                 Task { await executeQuery(resetPage: false) }
                             }
                         }
                     } label: {
-                        Text("\(pageSize) 条/页")
+                        Text(String(format: localized(QueryLocalizationKey.pageSizeLabel), pageSize))
                     }
                     .menuStyle(.borderlessButton)
                 }
@@ -307,12 +308,24 @@ struct QueryView: View {
         guard let data = rawQuery.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data),
               let prettyData = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted]) else {
-            errorMessage = "JSON 格式错误"
+            errorMessage = AppLanguage.localizedString("JSON 格式错误")
             return
         }
         rawQuery = String(decoding: prettyData, as: UTF8.self)
         errorMessage = nil
     }
+
+    private func localized(_ key: String) -> String {
+        AppLanguage.localized(key, locale: locale)
+    }
+}
+
+private enum QueryLocalizationKey {
+    static let duration = "query_duration"
+    static let notExecuted = "query_not_executed"
+    static let pagination = "query_pagination"
+    static let pageSizeOption = "query_page_size_option"
+    static let pageSizeLabel = "query_page_size_label"
 }
 
 private enum QueryInputPresentation: String, CaseIterable, Identifiable {
@@ -320,7 +333,7 @@ private enum QueryInputPresentation: String, CaseIterable, Identifiable {
     case outline
 
     var id: String { rawValue }
-    var title: String { self == .editor ? "编辑" : "折叠" }
+    var title: LocalizedStringKey { self == .editor ? "编辑" : "折叠" }
 }
 
 private enum QueryResultPresentation: String, CaseIterable, Identifiable {
@@ -328,7 +341,7 @@ private enum QueryResultPresentation: String, CaseIterable, Identifiable {
     case text
 
     var id: String { rawValue }
-    var title: String { self == .json ? "JSON" : "原文" }
+    var title: LocalizedStringKey { self == .json ? "JSON" : "原文" }
 }
 
 /// 查询 DSL 的固定字段名，避免 UI 自动拼接时出现无语义的字符串。

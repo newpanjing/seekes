@@ -63,8 +63,8 @@ struct SidebarView: View {
                                 Divider()
                                 Button("删除", role: .destructive) {
                                     NSAlert.showConfirmation(
-                                        title: "删除连接",
-                                        message: "确定要删除连接 \(connection.name) 吗？此操作不可撤销。"
+                                        title: AppLanguage.localizedString("删除连接"),
+                                        message: String(format: AppLanguage.localizedString("确定要删除连接 %@ 吗？此操作不可撤销。"), connection.name)
                                     ) { confirmed in
                                         if confirmed { appState.deleteConnection(connection) }
                                     }
@@ -89,7 +89,7 @@ struct SidebarView: View {
             }
             .padding(12)
         }
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color(NSColor.underPageBackgroundColor))
     }
 }
 
