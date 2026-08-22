@@ -22,7 +22,7 @@ jobs:
 
       - name: Verify bundle identifier
         run: |
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/SeekES.app/Contents/Info.plist)" = "com.github.newpanjing.seekes"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/SeekES.app/Contents/Info.plist)" = "com.noondot.SeekES"
 
       - name: Package app
         run: |

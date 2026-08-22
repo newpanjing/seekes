@@ -10,6 +10,7 @@
 		1E3E111EFD3DA85A9724E3BA /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C54CCF3A2155B6112ED94E3 /* OverviewView.swift */; };
 		212BEF6938A23C8911077DC7 /* AnalyzerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ABD7B79DBC6FE0AA9BFA656 /* AnalyzerView.swift */; };
 		26CEB4C33112F2D4671F2B30 /* en.lproj in Resources */ = {isa = PBXBuildFile; fileRef = 518109B7201FF02CA2254F4A /* en.lproj */; };
+		2B91DBE5C893498543181E00 /* ConnectionManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF136425E964F7D6614EAEA9 /* ConnectionManagementView.swift */; };
 		39E0480AA608F7F70352E038 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28BEC38FECD75257E91433C8 /* SettingsView.swift */; };
 		4D69723C969A1F1C6F953A7E /* IndexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDA2449844ABB63F8C18EF93 /* IndexView.swift */; };
 		5D29B0D3427763BFD3EA2550 /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150B5382C8CD54DD5D807C8C /* AppModels.swift */; };
@@ -22,8 +23,6 @@
 		899C17BDA6A6079E9B7D8E9E /* ru.lproj in Resources */ = {isa = PBXBuildFile; fileRef = B20813479EB4F7B69D90F1B3 /* ru.lproj */; };
 		942E503C3A9F0A87452D734A /* JSONSyntaxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB70FD9EF5236A5818B2094 /* JSONSyntaxView.swift */; };
 		97BB67D5CCAAF4EF963B107C /* Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4914E987E50EEC85ECB5FAFB /* Connection.swift */; };
-		2B91DBE5C893498543181E00 /* ConnectionManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF136425E964F7D6614EAEA9 /* ConnectionManagementView.swift */; };
-		D10000000000000000000001 /* PersistenceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000002 /* PersistenceModels.swift */; };
 		A1D486517E573F704A6106DE /* ko.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A8A529183CCF0C2550F6D1E9 /* ko.lproj */; };
 		A26AEDAD872AE6BBE1F5712F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAF1C74968115C0578D01245 /* Assets.xcassets */; };
 		A3E3F7CA27DF63F1F07650C6 /* QueryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68663735BAE48CCA3045861B /* QueryView.swift */; };
@@ -33,6 +32,7 @@
 		B466A6A7BBC4CDD6C3F4CD20 /* DevToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20F3279701873470C1FFD058 /* DevToolsView.swift */; };
 		BFCB48A0ED8BA0E24BC882AD /* ElasticClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9ADAAA9B16888591A3E39B0 /* ElasticClientApp.swift */; };
 		CC85C4F51CD472800DA8CD2E /* IndexListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B667D329EBA0E53356FEA5ED /* IndexListView.swift */; };
+		D10000000000000000000001 /* PersistenceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000002 /* PersistenceModels.swift */; };
 		E5DA52F3CC34F0C447B3B36F /* ja.lproj in Resources */ = {isa = PBXBuildFile; fileRef = 0448743461CC00D1E7424728 /* ja.lproj */; };
 		E77435F4468A9AC2231854E7 /* DocumentOperationPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C761E79924E522C9DEB766 /* DocumentOperationPanelView.swift */; };
 		E9560B841EF3D753CD27F67D /* IndexViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A9B780B250F41CB48AA7109 /* IndexViewModel.swift */; };
@@ -44,7 +44,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0448743461CC00D1E7424728 /* ja.lproj */ = {isa = PBXFileReference; path = ja.lproj; sourceTree = "<group>"; };
+		0448743461CC00D1E7424728 /* ja.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = ja.lproj; sourceTree = "<group>"; };
 		150B5382C8CD54DD5D807C8C /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
 		20F3279701873470C1FFD058 /* DevToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevToolsView.swift; sourceTree = "<group>"; };
 		28BEC38FECD75257E91433C8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -53,11 +53,9 @@
 		3A9B780B250F41CB48AA7109 /* IndexViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexViewModel.swift; sourceTree = "<group>"; };
 		43E9A7EDF30BC6B0B787877A /* ConsoleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleView.swift; sourceTree = "<group>"; };
 		4914E987E50EEC85ECB5FAFB /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
-		BF136425E964F7D6614EAEA9 /* ConnectionManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManagementView.swift; sourceTree = "<group>"; };
-		D10000000000000000000002 /* PersistenceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceModels.swift; sourceTree = "<group>"; };
 		4FB70FD9EF5236A5818B2094 /* JSONSyntaxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONSyntaxView.swift; sourceTree = "<group>"; };
 		5053F28CBDE54AC7620687C8 /* Index.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Index.swift; sourceTree = "<group>"; };
-		518109B7201FF02CA2254F4A /* en.lproj */ = {isa = PBXFileReference; path = en.lproj; sourceTree = "<group>"; };
+		518109B7201FF02CA2254F4A /* en.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = en.lproj; sourceTree = "<group>"; };
 		54EBAFFADA8079F82917FDFA /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
 		5580A7406E8F8867F8816FD8 /* JSONFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONFormatter.swift; sourceTree = "<group>"; };
 		68663735BAE48CCA3045861B /* QueryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryView.swift; sourceTree = "<group>"; };
@@ -65,14 +63,16 @@
 		6C54CCF3A2155B6112ED94E3 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
 		9F7E8AD6015E917BBD72472B /* Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
 		A5C761E79924E522C9DEB766 /* DocumentOperationPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentOperationPanelView.swift; sourceTree = "<group>"; };
-		A8A529183CCF0C2550F6D1E9 /* ko.lproj */ = {isa = PBXFileReference; path = ko.lproj; sourceTree = "<group>"; };
+		A8A529183CCF0C2550F6D1E9 /* ko.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = ko.lproj; sourceTree = "<group>"; };
 		AAF1C74968115C0578D01245 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		B20813479EB4F7B69D90F1B3 /* ru.lproj */ = {isa = PBXFileReference; path = ru.lproj; sourceTree = "<group>"; };
+		B20813479EB4F7B69D90F1B3 /* ru.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = ru.lproj; sourceTree = "<group>"; };
 		B667D329EBA0E53356FEA5ED /* IndexListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexListView.swift; sourceTree = "<group>"; };
 		B927D61E989DC590BEC08191 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		BDA2449844ABB63F8C18EF93 /* IndexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexView.swift; sourceTree = "<group>"; };
-		C11CBCC7F4C0EC9375F9F4C9 /* zh-Hans.lproj */ = {isa = PBXFileReference; path = "zh-Hans.lproj"; sourceTree = "<group>"; };
+		BF136425E964F7D6614EAEA9 /* ConnectionManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManagementView.swift; sourceTree = "<group>"; };
+		C11CBCC7F4C0EC9375F9F4C9 /* zh-Hans.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "zh-Hans.lproj"; sourceTree = "<group>"; };
 		C688C1B540BCD2FE0D5C1A27 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
+		D10000000000000000000002 /* PersistenceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceModels.swift; sourceTree = "<group>"; };
 		D829B99AB220DAB68BA588A0 /* DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentViewModel.swift; sourceTree = "<group>"; };
 		DAC027CDCA8549674AB02541 /* ESAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESAPIClient.swift; sourceTree = "<group>"; };
 		DE00D5E3C7CDF48A44FA1EED /* SeekES.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeekES.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -239,13 +239,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-					7D12EF81F11AD61D518F2F5B = {
-						DevelopmentTeam = "";
-						ProvisioningStyle = Automatic;
-					};
-				};
+				LastUpgradeCheck = 2700;
 			};
 			buildConfigurationList = 4FC04D0BBB0B54462E16B302 /* Build configuration list for PBXProject "SeekES" */;
 			developmentRegion = en;
@@ -326,15 +320,21 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SeekES.entitlements;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = "ElasticClient/Info-Static.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = SeekES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.github.newpanjing.seekes;
+				PRODUCT_BUNDLE_IDENTIFIER = com.noondot.SeekES;
 				PRODUCT_NAME = SeekES;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -344,15 +344,21 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SeekES.entitlements;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = "ElasticClient/Info-Static.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = SeekES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.github.newpanjing.seekes;
+				PRODUCT_BUNDLE_IDENTIFIER = com.noondot.SeekES;
 				PRODUCT_NAME = SeekES;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -393,10 +399,12 @@
 				CODE_SIGN_ENTITLEMENTS = SeekES.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 3AVKA6L8FE;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -416,9 +424,10 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.github.newpanjing.seekes;
+				PRODUCT_BUNDLE_IDENTIFIER = com.noondot.SeekES;
 				PRODUCT_NAME = SeekES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.9;
@@ -461,10 +470,12 @@
 				CODE_SIGN_ENTITLEMENTS = SeekES.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 3AVKA6L8FE;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -477,9 +488,10 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.github.newpanjing.seekes;
+				PRODUCT_BUNDLE_IDENTIFIER = com.noondot.SeekES;
 				PRODUCT_NAME = SeekES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.9;

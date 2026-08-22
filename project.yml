@@ -1,6 +1,6 @@
 name: SeekES
 options:
-  bundleIdPrefix: com.github.newpanjing
+  bundleIdPrefix: com.noondot
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
@@ -10,7 +10,7 @@ settings:
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     PRODUCT_NAME: SeekES
-    PRODUCT_BUNDLE_IDENTIFIER: com.github.newpanjing.seekes
+    PRODUCT_BUNDLE_IDENTIFIER: com.noondot.SeekES
     INFOPLIST_FILE: ElasticClient/Info-Static.plist
     CODE_SIGN_ENTITLEMENTS: SeekES.entitlements
     CODE_SIGN_STYLE: Automatic
@@ -42,7 +42,7 @@ targets:
       base:
         INFOPLIST_FILE: ElasticClient/Info-Static.plist
         PRODUCT_NAME: SeekES
-        PRODUCT_BUNDLE_IDENTIFIER: com.github.newpanjing.seekes
+        PRODUCT_BUNDLE_IDENTIFIER: com.noondot.SeekES
         CODE_SIGN_ENTITLEMENTS: SeekES.entitlements
       configs:
         Debug:
